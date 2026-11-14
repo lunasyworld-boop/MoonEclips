@@ -172,13 +172,18 @@ public final class WipeManager implements Listener {
             String lastRun = plugin.getConfig().getString("schedule.last-run", "");
             String runKey = target.toLocalDate().toString() + "@" + target.toLocalTime();
             if (lastRun.equals(runKey)) return;
-            if (!now.isBefore(start) && !now.isAfter(target.plusSeconds(1))) {
+            long missedGraceSeconds = Math.max(5L,
+                    plugin.getConfig().getLong("schedule.missed-run-grace-seconds", 300L));
+            if (!now.isBefore(start) && !now.isAfter(target.plusSeconds(missedGraceSeconds))) {
                 plugin.getConfig().set("schedule.last-run", runKey);
                 if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
                     plugin.getConfig().set("schedule.enabled", false);
                 }
                 plugin.saveConfig();
                 long seconds = Math.max(0L, Duration.between(now, target).getSeconds());
+                if (seconds == 0L && now.isAfter(target)) {
+                    plugin.getLogger().warning("MoonWipe: время расписания было пропущено из-за задержки сервера; запускаю вайп сразу в пределах допустимого окна.");
+                }
                 startCountdown((int) Math.min(Integer.MAX_VALUE, seconds), "Расписание");
             }
         } catch (Exception ex) {
@@ -279,14 +284,10 @@ public final class WipeManager implements Listener {
     }
 
     private void performWipe() {
+        if (wipeExecuting) return;
         countdownRunning = false;
         wipeExecuting = true;
         confirmationExpiresAt = 0L;
-
-        List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
-        for (Player player : online) {
-            player.sendMessage(msg("&cНачинается полный вайп. Сервер будет перезапущен."));
-        }
 
         byte[] oldServerProperties = null;
         AuctionSnapshot auctionSnapshot = null;
@@ -301,60 +302,82 @@ public final class WipeManager implements Listener {
             if (!resetWorlds && !resetEconomy && !resetAuction) {
                 throw new IllegalStateException("Не выбрано ни одного модуля для сброса.");
             }
+
             String newWorldName = validateWorldName(plugin.getConfig().getString("settings.new-world-name", "world"));
             List<String> worldFolders = resetWorlds ? collectWorldFolderNames(newWorldName) : List.of();
             if (!plugin.getConfig().getBoolean("backup.enabled", true)) {
                 throw new IllegalStateException("Резервное копирование отключено; безопасный вайп отменён.");
             }
-            if (plugin.getConfig().getBoolean("settings.reset-economy", true)) {
+
+            if (resetEconomy) {
                 refreshEconomy();
                 if (economy == null) throw new IllegalStateException("Vault Economy provider не найден. Вайп отменён.");
             }
-            if (plugin.getConfig().getBoolean("settings.reset-auction", true)) {
-                findAuctionDatabasePath();
-            }
+            if (resetAuction) findAuctionDatabasePath();
+
             Path propertiesPath = serverRoot().resolve("server.properties");
             if (!Files.isRegularFile(propertiesPath)) throw new IOException("Файл server.properties не найден.");
             oldServerProperties = Files.readAllBytes(propertiesPath);
 
+            // Сначала сохраняем состояние и делаем резервную копию. Игроков нельзя
+            // отключать до успешного завершения всех подготовительных операций.
             saveWorldsAndPlayers();
-            for (Player player : new ArrayList<>(Bukkit.getOnlinePlayers())) {
-                player.kickPlayer(MoonWipePlugin.color("&5Moon&bEclips &8» &cВыполняется полный вайп. Зайдите после перезапуска."));
-            }
-            Bukkit.savePlayers();
             Path backup = createBackupArchive();
             plugin.getLogger().info("Резервная копия перед вайпом: " + backup);
 
             if (resetWorlds) {
-                levelNameChanged = true;
                 updateLevelName(newWorldName);
+                levelNameChanged = true;
             }
 
-            if (plugin.getConfig().getBoolean("settings.reset-economy", true)) {
+            if (resetEconomy) {
                 balances = resetBalances();
                 balancesChanged = true;
             }
 
-            if (plugin.getConfig().getBoolean("settings.reset-auction", true)) {
+            if (resetAuction) {
                 auctionSnapshot = clearAuctionDatabase();
             }
 
+            // Маркер пишется только после успешной подготовки всех выбранных модулей.
             if (resetWorlds) writePendingWipe(newWorldName, worldFolders);
-            Bukkit.broadcastMessage(msg("&aДанные вайпа подготовлены. Сервер сейчас штатно остановится."));
-            Bukkit.getScheduler().runTaskLater(plugin, Bukkit::shutdown, 20L);
+
+            Bukkit.broadcastMessage(msg("&aПодготовка вайпа завершена. Сервер сейчас остановится для очистки и запуска нового мира."));
+            for (Player player : new ArrayList<>(Bukkit.getOnlinePlayers())) {
+                player.kickPlayer(MoonWipePlugin.color("&5Moon&bEclips &8» &cВыполняется полный вайп. Сервер перезапускается, зайдите позже."));
+            }
+
+            // Даём Bukkit завершить обработку отключений, затем штатно останавливаем JVM.
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                plugin.getLogger().warning("MoonWipe: вызывается штатная остановка сервера. Для автоматического возврата онлайн панель хостинга должна перезапускать остановленный сервер.");
+                Bukkit.shutdown();
+            }, 20L);
         } catch (Exception ex) {
-            plugin.getLogger().severe("MoonWipe не смог завершить подготовку: " + ex.getMessage());
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "MoonWipe не смог завершить подготовку вайпа. Проверьте ошибку ниже; сервер не будет остановлен.", ex);
+
             if (auctionSnapshot != null) restoreAuctionDatabase(auctionSnapshot);
             if (balancesChanged) restoreBalances(balances);
             if (levelNameChanged && oldServerProperties != null) {
                 try {
                     Files.write(serverRoot().resolve("server.properties"), oldServerProperties);
                 } catch (IOException restoreError) {
-                    plugin.getLogger().severe("Не удалось вернуть server.properties: " + restoreError.getMessage());
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Не удалось вернуть server.properties после ошибки вайпа.", restoreError);
                 }
             }
+
+            // Если подготовка сорвалась после создания маркера, удаляем его,
+            // чтобы следующий обычный запуск не удалил мир неожиданно.
+            try {
+                Files.deleteIfExists(plugin.getDataFolder().toPath().resolve("pending-wipe.yml"));
+            } catch (IOException cleanupError) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Не удалось удалить незавершённый pending-wipe.yml.", cleanupError);
+            }
+
             wipeExecuting = false;
-            Bukkit.broadcastMessage(msg("&cПодготовка вайпа прервана. Миры не удалены. Проверь консоль и резервную копию."));
+            Bukkit.broadcastMessage(msg("&cПодготовка вайпа прервана. Игроки не были отключены; миры не удалялись. Проверь консоль."));
         }
     }
 
