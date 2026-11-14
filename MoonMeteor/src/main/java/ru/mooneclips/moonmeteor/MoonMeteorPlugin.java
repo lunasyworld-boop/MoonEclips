@@ -353,7 +353,11 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             player.sendMessage("§cЭкономика недоступна. Обратитесь к администрации.");
             return;
         }
-        economy.depositPlayer(player, value);
+        var response = economy.depositPlayer(player, value);
+        if (response == null || !response.transactionSuccess()) {
+            player.sendMessage("§cНе удалось начислить монеты. Предмет сохранён, попробуйте ещё раз.");
+            return;
+        }
         event.getItem().remove();
         player.sendMessage("§e✦ §aНа ваш баланс начислено §6" + value + " Money§a!");
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
