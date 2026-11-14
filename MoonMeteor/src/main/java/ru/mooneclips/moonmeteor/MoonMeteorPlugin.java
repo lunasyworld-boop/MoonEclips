@@ -286,9 +286,14 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         List<ItemStack> loot = getLoot(rarity);
         if (loot.isEmpty()) return;
         ItemStack stack = loot.get(random.nextInt(loot.size())).clone();
-        int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
-        int max = Math.max(min, getConfig().getInt("random-loot.max-amount", 3));
-        stack.setAmount(min == max ? min : min + random.nextInt(max - min + 1));
+        if (stack.getMaxStackSize() > 1) {
+            int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
+            int max = Math.min(stack.getMaxStackSize(),
+                    Math.max(min, getConfig().getInt("random-loot.max-amount", 3)));
+            stack.setAmount(min == max ? min : min + random.nextInt(max - min + 1));
+        } else {
+            stack.setAmount(1);
+        }
         // Сразу выбрасываем за край корпуса, чтобы предметы не застревали в чаше.
         double angle = random.nextDouble() * Math.PI * 2.0;
         Vector direction = new Vector(Math.cos(angle), 0, Math.sin(angle)).normalize();
