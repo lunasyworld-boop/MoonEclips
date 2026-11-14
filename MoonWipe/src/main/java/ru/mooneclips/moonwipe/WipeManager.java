@@ -152,15 +152,20 @@ public final class WipeManager implements Listener {
     private void checkSchedule() {
         if (countdownRunning || wipeExecuting || !plugin.getConfig().getBoolean("schedule.enabled", false)) return;
         try {
-            DayOfWeek day = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.day", "SATURDAY").toUpperCase(Locale.ROOT));
-            LocalTime time = LocalTime.parse(plugin.getConfig().getString("schedule.time", "14:00"));
             String zoneName = plugin.getConfig().getString("schedule.timezone", "system");
             ZoneId zone = zoneName == null || zoneName.equalsIgnoreCase("system")
                     ? ZoneId.systemDefault() : ZoneId.of(zoneName);
             ZonedDateTime now = ZonedDateTime.now(zone);
-            ZonedDateTime target = now.with(TemporalAdjusters.nextOrSame(day)).with(time);
-            if (target.toLocalDate().isBefore(now.toLocalDate()) || target.isBefore(now.minusSeconds(1))) {
-                target = target.plusWeeks(1);
+            LocalTime time = LocalTime.parse(plugin.getConfig().getString("schedule.time", "14:00"));
+            ZonedDateTime target;
+            if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
+                LocalDate date = LocalDate.parse(plugin.getConfig().getString("schedule.date", LocalDate.now(zone).toString()));
+                target = ZonedDateTime.of(date, time, zone);
+                if (target.isBefore(now.minusSeconds(1))) return;
+            } else {
+                DayOfWeek day = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.day", "SATURDAY").toUpperCase(Locale.ROOT));
+                target = now.with(TemporalAdjusters.nextOrSame(day)).with(time);
+                if (target.toLocalDate().isBefore(now.toLocalDate()) || target.isBefore(now.minusSeconds(1))) target = target.plusWeeks(1);
             }
             int configuredCountdown = Math.max(5, plugin.getConfig().getInt("settings.countdown-seconds", 60));
             ZonedDateTime start = target.minusSeconds(configuredCountdown);
@@ -169,6 +174,9 @@ public final class WipeManager implements Listener {
             if (lastRun.equals(runKey)) return;
             if (!now.isBefore(start) && !now.isAfter(target.plusSeconds(1))) {
                 plugin.getConfig().set("schedule.last-run", runKey);
+                if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
+                    plugin.getConfig().set("schedule.enabled", false);
+                }
                 plugin.saveConfig();
                 long seconds = Math.max(0L, Duration.between(now, target).getSeconds());
                 startCountdown((int) Math.min(Integer.MAX_VALUE, seconds), "Расписание");
@@ -198,6 +206,52 @@ public final class WipeManager implements Listener {
         plugin.getConfig().set("schedule.enabled", false);
         plugin.saveConfig();
         sender.sendMessage(msg("&eАвтоматическое расписание MoonWipe выключено."));
+    }
+
+    public LocalDate getSelectedDate() {
+        String zoneName = plugin.getConfig().getString("schedule.timezone", "system");
+        ZoneId zone = zoneName == null || zoneName.equalsIgnoreCase("system") ? ZoneId.systemDefault() : ZoneId.of(zoneName);
+        return LocalDate.parse(plugin.getConfig().getString("schedule.date", LocalDate.now(zone).plusDays(1).toString()));
+    }
+
+    public LocalTime getSelectedTime() {
+        return LocalTime.parse(plugin.getConfig().getString("schedule.time", "14:00"));
+    }
+
+    public void saveOneTimeSchedule(LocalDate date, LocalTime time, CommandSender sender) {
+        String zoneName = plugin.getConfig().getString("schedule.timezone", "system");
+        ZoneId zone = zoneName == null || zoneName.equalsIgnoreCase("system") ? ZoneId.systemDefault() : ZoneId.of(zoneName);
+        ZonedDateTime target = ZonedDateTime.of(date, time, zone);
+        if (!target.isAfter(ZonedDateTime.now(zone).plusSeconds(5))) {
+            sender.sendMessage(msg("&cВыбери дату и время в будущем."));
+            return;
+        }
+        plugin.getConfig().set("schedule.mode", "once");
+        plugin.getConfig().set("schedule.date", date.toString());
+        plugin.getConfig().set("schedule.time", String.format(Locale.ROOT, "%02d:%02d", time.getHour(), time.getMinute()));
+        plugin.getConfig().set("schedule.enabled", true);
+        plugin.getConfig().set("schedule.last-run", "");
+        plugin.saveConfig();
+        sender.sendMessage(msg("&aОдноразовый вайп назначен на &f" + date + " " + time + "&a."));
+    }
+
+    public void toggleResetModule(String key) {
+        if (!Set.of("reset-worlds", "reset-economy", "reset-auction").contains(key)) return;
+        String path = "settings." + key;
+        plugin.getConfig().set(path, !plugin.getConfig().getBoolean(path, true));
+        plugin.saveConfig();
+    }
+
+    public boolean isResetModuleEnabled(String key) {
+        return plugin.getConfig().getBoolean("settings." + key, true);
+    }
+
+    public String getScheduleDescription() {
+        if (!plugin.getConfig().getBoolean("schedule.enabled", false)) return "выключено";
+        if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
+            return plugin.getConfig().getString("schedule.date", "?") + " " + plugin.getConfig().getString("schedule.time", "14:00");
+        }
+        return plugin.getConfig().getString("schedule.day", "SATURDAY") + " " + plugin.getConfig().getString("schedule.time", "14:00");
     }
 
     public void sendStatus(CommandSender sender) {
