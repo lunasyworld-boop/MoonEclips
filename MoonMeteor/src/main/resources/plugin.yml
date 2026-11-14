@@ -1,0 +1,16 @@
+name: MoonMeteor
+version: 1.0.0
+main: ru.mooneclips.moonmeteor.MoonMeteorPlugin
+api-version: '1.21'
+author: MoonEclips
+description: Meteor event with configurable loot, rarity and protected area.
+commands:
+  moonmeteor:
+    description: Управление событием метеорита
+    aliases: [mmeteor]
+    usage: /moonmeteor
+    permission: moonmeteor.admin
+permissions:
+  moonmeteor.admin:
+    description: Полное управление MoonMeteor
+    default: op
