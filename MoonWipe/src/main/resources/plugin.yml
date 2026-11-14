@@ -4,7 +4,8 @@ main: ru.mooneclips.moonwipe.MoonWipePlugin
 api-version: '1.21'
 load: POSTWORLD
 author: MoonEclips
-softdepend: [Vault, Essentials, EconomicMoonEclips, LuckPerms]
+depend: [Vault]
+softdepend: [Essentials, EconomicMoonEclips, LuckPerms]
 description: Безопасный ручной и автоматический полный вайп MoonEclips.
 commands:
   mwipe:
