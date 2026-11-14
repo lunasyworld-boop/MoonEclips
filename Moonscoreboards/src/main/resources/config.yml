@@ -1,0 +1,23 @@
+update-interval-seconds: 5
+title-frames:
+  - '&5&lMOONECLIPS'
+  - '&d&lMOONECLIPS'
+  - '&b&lMOONECLIPS'
+  - '&f&lMOONECLIPS'
+scoreboard:
+  enabled: true
+  lines:
+    - '&8&m----------------'
+    - '&fМонеты: &6%coins%'
+    - '&fПривилегия: &d%rank%'
+    - '&fОсталось: &e%rank_days%'
+    - '&8&m----------------'
+    - '&fУбийства: &a%kills%'
+    - '&fСмерти: &c%deaths%'
+    - '&fK/D: &b%kd%'
+    - '&fОнлайн: &a%online%'
+    - '&fПинг: &b%ping% ms'
+    - '&8mooneclips.playmc.tech'
+profile:
+  title: '&5Профиль игрока'
+  size: 45
