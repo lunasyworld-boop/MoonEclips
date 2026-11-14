@@ -240,6 +240,25 @@ public final class WipeManager implements Listener {
         boolean levelNameChanged = false;
 
         try {
+            if (!plugin.getConfig().getBoolean("settings.reset-worlds", true)) {
+                throw new IllegalStateException("Очистка миров выключена в конфигурации; полный вайп отменён.");
+            }
+            String newWorldName = validateWorldName(plugin.getConfig().getString("settings.new-world-name", "world"));
+            List<String> worldFolders = collectWorldFolderNames(newWorldName);
+            if (!plugin.getConfig().getBoolean("backup.enabled", true)) {
+                throw new IllegalStateException("Резервное копирование отключено; безопасный вайп отменён.");
+            }
+            if (plugin.getConfig().getBoolean("settings.reset-economy", true)) {
+                refreshEconomy();
+                if (economy == null) throw new IllegalStateException("Vault Economy provider не найден. Вайп отменён.");
+            }
+            if (plugin.getConfig().getBoolean("settings.reset-auction", true)) {
+                findAuctionDatabasePath();
+            }
+            Path propertiesPath = serverRoot().resolve("server.properties");
+            if (!Files.isRegularFile(propertiesPath)) throw new IOException("Файл server.properties не найден.");
+            oldServerProperties = Files.readAllBytes(propertiesPath);
+
             saveWorldsAndPlayers();
             for (Player player : new ArrayList<>(Bukkit.getOnlinePlayers())) {
                 player.kickPlayer(MoonWipePlugin.color("&5Moon&bEclips &8» &cВыполняется полный вайп. Зайдите после перезапуска."));
@@ -248,10 +267,6 @@ public final class WipeManager implements Listener {
             Path backup = createBackupArchive();
             plugin.getLogger().info("Резервная копия перед вайпом: " + backup);
 
-            String newWorldName = validateWorldName(plugin.getConfig().getString("settings.new-world-name", "world"));
-            List<String> worldFolders = collectWorldFolderNames(newWorldName);
-
-            oldServerProperties = Files.readAllBytes(serverRoot().resolve("server.properties"));
             updateLevelName(newWorldName);
             levelNameChanged = true;
 
@@ -262,10 +277,6 @@ public final class WipeManager implements Listener {
 
             if (plugin.getConfig().getBoolean("settings.reset-auction", true)) {
                 auctionSnapshot = clearAuctionDatabase();
-            }
-
-            if (!plugin.getConfig().getBoolean("settings.reset-worlds", true)) {
-                throw new IllegalStateException("Очистка миров выключена в конфигурации; полный вайп отменён.");
             }
 
             writePendingWipe(newWorldName, worldFolders);
@@ -611,6 +622,11 @@ public final class WipeManager implements Listener {
     private static String validateWorldName(String name) throws IOException {
         if (name == null || !name.matches("[A-Za-z0-9._-]+") || name.equals(".") || name.equals("..")) {
             throw new IOException("Недопустимое имя папки мира: " + name);
+        }
+        Set<String> reserved = Set.of("plugins", "logs", "libraries", "cache", "crash-reports",
+                "versions", "config", "mods", "resourcepacks", "backups");
+        if (reserved.contains(name.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Имя папки мира совпадает с системной папкой сервера: " + name);
         }
         return name;
     }
