@@ -5,6 +5,7 @@ event:
   item-despawn-seconds: 15
   protection-radius: 20
   protection-height: 20
+  protection-depth: 4
   hazard-interval-seconds: 40
   hazard-effect-duration-seconds: 40
 spawn:
