@@ -94,16 +94,14 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         saveDefaultConfig();
         dropKey = new NamespacedKey(this, "meteor_drop");
         coinValueKey = new NamespacedKey(this, "meteor_coin_value");
-        if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
-            var registration = Bukkit.getServicesManager().getRegistration(Economy.class);
-            if (registration != null) economy = registration.getProvider();
-        }
-        if (economy == null) getLogger().warning("Vault economy не найден: монеты-подсолнухи не будут выпадать.");
+        resolveEconomy();
+        if (economy == null) getLogger().warning("Vault economy пока не найден: плагин повторит поиск при выпадении монет.");
         Bukkit.getPluginManager().registerEvents(this, this);
         cleanupPersistedRuntime();
         active = false;
         getConfig().set("runtime.active", false);
         saveConfig();
+        initializeGeneratedLoot();
         scheduleNextAutomaticStart();
         getLogger().info("MoonMeteor 1.0.0 включён.");
     }
@@ -340,14 +338,37 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    private Economy resolveEconomy() {
+        if (Bukkit.getPluginManager().getPlugin("Vault") == null) return null;
+        if (economy == null) {
+            var registration = Bukkit.getServicesManager().getRegistration(Economy.class);
+            if (registration != null) economy = registration.getProvider();
+        }
+        return economy;
+    }
+
+    private void initializeGeneratedLoot() {
+        if (getConfig().getBoolean("loot.generated-defaults", false)) return;
+        for (String rarity : List.of(COMMON, MOLTEN, BURNING)) {
+            List<ItemStack> items = getLoot(rarity);
+            for (int i = 0; i < 45; i++) items.add(generateRandomLootItem(rarity));
+            getConfig().set("loot." + rarity, items);
+        }
+        getConfig().set("loot.generated-defaults", true);
+        saveConfig();
+    }
+
     private void dropLoot() {
         if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
         String rarity = eventRarity;
         List<ItemStack> loot = getLoot(rarity);
         if (loot.isEmpty()) return;
-        boolean coinDrop = economy != null && random.nextDouble() < getConfig().getDouble("coins.drop-chance", 0.08);
+        boolean coinDrop = resolveEconomy() != null
+                && random.nextDouble() < Math.max(0.0, Math.min(1.0, getConfig().getDouble("coins.drop-chance", 0.08)));
         ItemStack stack = coinDrop ? createMeteorCoin() : loot.get(random.nextInt(loot.size())).clone();
-        if (stack.getMaxStackSize() > 1) {
+        if (coinDrop) {
+            stack.setAmount(1);
+        } else if (stack.getMaxStackSize() > 1) {
             int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
             int max = Math.min(stack.getMaxStackSize(),
                     Math.max(min, getConfig().getInt("random-loot.max-amount", 3)));
@@ -399,11 +420,12 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             event.getItem().remove();
             return;
         }
-        if (economy == null) {
+        Economy provider = resolveEconomy();
+        if (provider == null) {
             player.sendMessage("§cЭкономика недоступна. Обратитесь к администрации.");
             return;
         }
-        var response = economy.depositPlayer(player, value);
+        var response = provider.depositPlayer(player, value);
         if (response == null || !response.transactionSuccess()) {
             player.sendMessage("§cНе удалось начислить монеты. Предмет сохранён, попробуйте ещё раз.");
             return;
