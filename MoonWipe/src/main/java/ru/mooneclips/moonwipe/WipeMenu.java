@@ -81,7 +81,7 @@ public final class WipeMenu implements Listener {
         fill(inv);
         inv.setItem(11, toggleItem(Material.GRASS_BLOCK, "&aИгровые миры и прогресс", "reset-worlds", "&7Миры, инвентари, эндер-сундуки,", "&7достижения и статистика."));
         inv.setItem(13, toggleItem(Material.GOLD_INGOT, "&6Баланс Money", "reset-economy", "&7Личные балансы через Vault", "&7(поддерживаемый Economy-провайдер)."));
-        inv.setItem(15, toggleItem(Material.AUCTION, "&bАукцион EconomicMoonEclips", "reset-auction", "&7Лоты и почта аукциона.", "&7Требуется проверенная SQLite-схема."));
+        inv.setItem(15, toggleItem(Material.CHEST, "&bАукцион EconomicMoonEclips", "reset-auction", "&7Лоты и почта аукциона.", "&7Требуется проверенная SQLite-схема."));
         inv.setItem(29, item(Material.BOOK, "&fДругие плагины", "&7Их данные пока не очищаются.", "&7Для каждого нужен отдельный безопасный", "&7адаптер под формат его хранения."));
         inv.setItem(40, item(Material.ARROW, "&fНазад"));
         player.openInventory(inv);
