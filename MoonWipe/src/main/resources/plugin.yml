@@ -1,0 +1,22 @@
+name: MoonWipe
+version: 1.0.0
+main: ru.mooneclips.moonwipe.MoonWipePlugin
+api-version: '1.21'
+author: MoonEclips
+description: Safe manual and scheduled server wipe manager
+load: STARTUP
+loadbefore:
+  - EconomicMoonEclips
+softdepend:
+  - Vault
+  - Essentials
+  - EconomicMoonEclips
+commands:
+  mwipe:
+    description: MoonWipe administration
+    usage: /mwipe
+    permission: moonwipe.admin
+permissions:
+  moonwipe.admin:
+    description: Allows full MoonWipe administration
+    default: op
