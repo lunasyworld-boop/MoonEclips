@@ -1,9 +1,10 @@
 event:
   duration-seconds: 600
+  loot-delay-seconds: 300
   drop-interval-seconds: 3
   item-despawn-seconds: 15
-  protection-radius: 8
-  protection-height: 8
+  protection-radius: 20
+  protection-height: 20
 spawn:
   world: world
   x: 0.5
