@@ -98,11 +98,23 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
                         " точка выделения записана. Название региона: " + id));
             }
             case "region" -> createRegion(sender, args);
+            case "build" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(msg("Эту команду нужно выполнить в игре."));
+                    return true;
+                }
+                if (!player.hasPermission("moonhub.admin")) {
+                    player.sendMessage(msg("Недостаточно прав."));
+                    return true;
+                }
+                player.sendMessage(msg("Начинаю создание отдельного мира MoonHub. Это может занять несколько минут."));
+                Bukkit.getScheduler().runTask(this, () -> new HubWorldBuilder(this).build(player));
+            }
             case "reload" -> {
                 reloadConfig();
                 sender.sendMessage(msg("Настройки перезагружены."));
             }
-            case "help" -> sender.sendMessage("§dMoonHub §7— /moonhub gui, /moonhub set <точка>, /moonhub pos1 <регион>, /moonhub pos2 <регион>, /moonhub region <регион> <safe|mine|pvp>, /moonhub reload");
+            case "help" -> sender.sendMessage("§dMoonHub §7— /moonhub gui, /moonhub set <точка>, /moonhub pos1 <регион>, /moonhub pos2 <регион>, /moonhub region <регион> <safe|mine|pvp>, /moonhub build, /moonhub reload");
             default -> sender.sendMessage(msg("Неизвестная команда. Используй /moonhub help."));
         }
         return true;
@@ -281,7 +293,13 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
         if (location.getWorld() == null) return null;
         ConfigurationSection section = getConfig().getConfigurationSection("regions");
         if (section == null) return null;
-        for (String id : section.getKeys(false)) {
+        List<String> ids = new ArrayList<>(section.getKeys(false));
+        ids.sort(Comparator.comparingInt(id -> switch (getConfig().getString("regions." + id + ".mode", "safe")) {
+            case "pvp" -> 0;
+            case "mine" -> 1;
+            default -> 2;
+        }));
+        for (String id : ids) {
             String base = "regions." + id;
             if (!location.getWorld().getName().equals(getConfig().getString(base + ".world"))) continue;
             if (location.getBlockX() >= getConfig().getInt(base + ".min-x")
