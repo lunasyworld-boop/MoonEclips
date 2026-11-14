@@ -115,6 +115,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         active = false;
         getConfig().set("runtime.active", false);
         getConfig().set("runtime.blocks", new ArrayList<>());
+        getConfig().set("runtime.original-blocks", new ArrayList<>());
         saveConfig();
     }
 
@@ -713,9 +714,10 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 || !location.getWorld().equals(meteorCenter.getWorld())) return false;
         int radius = Math.max(20, getConfig().getInt("event.protection-radius", 20));
         int height = Math.max(20, getConfig().getInt("event.protection-height", 20));
+        int depth = Math.max(1, getConfig().getInt("event.protection-depth", 4));
         return Math.abs(location.getBlockX() - meteorCenter.getBlockX()) <= radius
                 && Math.abs(location.getBlockZ() - meteorCenter.getBlockZ()) <= radius
-                && location.getBlockY() >= baseY - 1 && location.getBlockY() <= baseY + height;
+                && location.getBlockY() >= baseY - depth && location.getBlockY() <= baseY + height;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
