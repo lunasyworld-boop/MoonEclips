@@ -456,7 +456,7 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
             player.kickPlayer(color("&cНа сервере начинается полный вайп. Зайдите позже."));
         }
 
-        CompletableFuture.runAsync(() -> {
+        getServer().getScheduler().runTaskLater(this, () -> CompletableFuture.runAsync(() -> {
             try {
                 if (getConfig().getBoolean("backup.enabled", true)) {
                     createBackupArchive();
@@ -483,7 +483,7 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
                 getLogger().severe("Wipe preparation failed; no wipe manifest was written: " + exception.getMessage());
                 Bukkit.getScheduler().runTask(this, () -> send(sender, "&cПодготовка вайпа отменена: " + exception.getMessage()));
             }
-        });
+        }), 40L);
     }
 
     private void createBackupArchive() throws IOException {
@@ -595,6 +595,14 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
             send(sender, "&cРезервное копирование отключено в config.yml.");
             return;
         }
+        if (!Bukkit.getOnlinePlayers().isEmpty()) {
+            send(sender, "&cДля отдельной резервной копии сначала отключи всех игроков. Это защищает их данные от неполного сохранения.");
+            return;
+        }
+        if (!wipeInProgress.compareAndSet(false, true)) {
+            send(sender, "&cДругая операция MoonWipe уже выполняется.");
+            return;
+        }
         send(sender, "&eСоздаю резервную копию. Это может занять некоторое время...");
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             world.save();
@@ -602,9 +610,15 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
         CompletableFuture.runAsync(() -> {
             try {
                 createBackupArchive();
-                Bukkit.getScheduler().runTask(this, () -> send(sender, "&aРезервная копия создана."));
+                Bukkit.getScheduler().runTask(this, () -> {
+                    wipeInProgress.set(false);
+                    send(sender, "&aРезервная копия создана.");
+                });
             } catch (Exception exception) {
-                Bukkit.getScheduler().runTask(this, () -> send(sender, "&cОшибка резервного копирования: " + exception.getMessage()));
+                Bukkit.getScheduler().runTask(this, () -> {
+                    wipeInProgress.set(false);
+                    send(sender, "&cОшибка резервного копирования: " + exception.getMessage());
+                });
             }
         });
     }
