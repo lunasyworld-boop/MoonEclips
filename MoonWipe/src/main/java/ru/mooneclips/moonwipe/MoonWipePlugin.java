@@ -254,14 +254,16 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
         for (UUID uuid : playerIds) {
             OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
             double balance = economy.getBalance(offlinePlayer);
-            if (!Double.isFinite(balance) || balance < 0.0D) {
+            if (!Double.isFinite(balance)) {
                 failures.add(uuid + " returned an invalid balance: " + balance);
                 continue;
             }
-            if (balance <= 0.0D) {
+            if (balance == 0.0D) {
                 continue;
             }
-            EconomyResponse response = economy.withdrawPlayer(offlinePlayer, balance);
+            EconomyResponse response = balance > 0.0D
+                    ? economy.withdrawPlayer(offlinePlayer, balance)
+                    : economy.depositPlayer(offlinePlayer, -balance);
             if (response.transactionSuccess()) {
                 changed++;
             } else {
@@ -303,6 +305,9 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
                     while (result.next()) {
                         tables.add(result.getString(1));
                     }
+                }
+                if (tables.isEmpty()) {
+                    throw new IllegalStateException("No application tables found; refusing to treat an unknown/empty database as a successful auction reset");
                 }
                 for (String table : tables) {
                     String quoted = "\"" + table.replace("\"", "\"\"") + "\"";
@@ -490,6 +495,14 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
             if (Files.exists(database)) {
                 sources.add(database);
             }
+            Path wal = database.resolveSibling(database.getFileName() + "-wal");
+            Path shm = database.resolveSibling(database.getFileName() + "-shm");
+            if (Files.exists(wal)) {
+                sources.add(wal);
+            }
+            if (Files.exists(shm)) {
+                sources.add(shm);
+            }
         }
         Path schematic = root.resolve("plugins/WorldEdit/schematics/hub-spawn.schem");
         if (Files.exists(schematic)) {
@@ -509,6 +522,10 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
         } catch (Exception exception) {
             Files.deleteIfExists(archive);
             throw exception;
+        }
+        if (!Files.isRegularFile(archive) || Files.size(archive) == 0L) {
+            Files.deleteIfExists(archive);
+            throw new IOException("backup archive was not created or is empty");
         }
         pruneBackups(backupDirectory);
         getLogger().info("Backup created: " + archive);
@@ -667,6 +684,9 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
     private void prepareConfirmation(CommandSender sender) {
         confirmationCode = String.format(Locale.ROOT, "%06d", new java.security.SecureRandom().nextInt(1_000_000));
         confirmationExpiresAt = System.currentTimeMillis() + 120_000L;
+        send(sender, "&eПодготовка полного вайпа. Будут удалены миры: &f" + String.join(", ", getConfig().getStringList("wipe.world-folders")));
+        send(sender, "&eMoney: &f" + getConfig().getBoolean("wipe.reset-money", true)
+                + " &e| Аукцион: &f" + getConfig().getBoolean("wipe.reset-auction-database", true));
         send(sender, "&eПроверь настройки и резервную копию. Для подтверждения в течение 2 минут введи:");
         send(sender, "&b/mwipe confirm " + confirmationCode);
         send(sender, "&cКоманда остановит сервер после создания резервной копии.");
