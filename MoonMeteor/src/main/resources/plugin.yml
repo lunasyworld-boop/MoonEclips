@@ -2,8 +2,9 @@ name: MoonMeteor
 version: 1.0.0
 main: ru.mooneclips.moonmeteor.MoonMeteorPlugin
 api-version: '1.21'
+softdepend: [Vault]
 author: MoonEclips
-description: Meteor event with configurable loot, rarity and protected area.
+description: Meteor event with configurable loot, rarity, protected area and Vault coin rewards.
 commands:
   moonmeteor:
     description: Управление событием метеорита
