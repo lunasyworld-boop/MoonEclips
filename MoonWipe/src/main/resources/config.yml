@@ -1,0 +1,42 @@
+# MoonWipe 1.0.0 — Paper 1.21.4 / Java 21
+# IMPORTANT: configure world-folders to match the actual server world names.
+# Never add plugins, the server root, or a folder containing backups to this list.
+
+timezone: "Europe/Berlin"
+
+schedule:
+  enabled: false
+  day: "SATURDAY"
+  time: "14:00"
+  # Set a valid Java ZoneId in timezone above. Schedule is disabled until configured.
+
+wipe:
+  # World folders are deleted at next startup after the server has been stopped.
+  # If server.properties uses level-name=hub-spawn, replace "world" below with
+  # "hub-spawn" ONLY after hub-spawn.schem has been verified and backed up.
+  world-folders:
+    - "world"
+    - "world_nether"
+    - "world_the_end"
+
+  reset-money: true
+  reset-auction-database: true
+  auction-database: "plugins/EconomicMoonEclips/auction.db"
+
+  # Extra plugin data files/folders are NEVER guessed or deleted automatically.
+  # Add only confirmed data paths here; do not add plugin config.yml files.
+  extra-data-paths: []
+
+backup:
+  enabled: true
+  folder: "plugins/MoonWipe/backups"
+  # Keep the newest N archives. 0 means keep all.
+  keep-newest: 5
+
+messages:
+  prefix: "&8[&bMoonWipe&8] "
+  warn-minutes:
+    - 30
+    - 10
+    - 5
+    - 1
