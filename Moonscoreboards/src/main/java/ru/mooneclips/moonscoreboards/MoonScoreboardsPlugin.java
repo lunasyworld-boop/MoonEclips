@@ -134,6 +134,7 @@ public final class MoonScoreboardsPlugin extends JavaPlugin implements Listener,
         }
         boards.put(player.getUniqueId(), board);
         player.setScoreboard(board);
+        refreshPlayer(player, board);
     }
 
     private void refreshAll() {
