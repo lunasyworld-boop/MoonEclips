@@ -189,8 +189,12 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         }, waitSeconds * 20L);
         visualTask = Bukkit.getScheduler().runTaskTimer(this, this::tickDrops, 10L, 10L);
         hazardCycle = 0;
-        hazardTask = Bukkit.getScheduler().runTaskTimer(this, this::applyMeteorHazard, 20L * 40L, 20L * 40L);
-        guardTask = Bukkit.getScheduler().runTaskTimer(this, this::spawnMeteorGuards, 20L * 60L, 20L * 60L);
+        long hazardInterval = Math.max(1, getConfig().getLong("event.hazard-interval-seconds", 40));
+        hazardTask = Bukkit.getScheduler().runTaskTimer(this, this::applyMeteorHazard,
+                20L * hazardInterval, 20L * hazardInterval);
+        long guardInterval = Math.max(1, getConfig().getLong("guards.interval-seconds", 60));
+        guardTask = Bukkit.getScheduler().runTaskTimer(this, this::spawnMeteorGuards,
+                20L * guardInterval, 20L * guardInterval);
         endTask = Bukkit.getScheduler().runTaskLater(this,
                 () -> stopEvent("§6§lМЕТЕОРИТ §8» §eСобытие завершено."), duration * 20L);
         if (admin != null) admin.sendMessage("§aСобытие метеорита запущено.");
@@ -413,9 +417,10 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
         PotionEffectType effect = (hazardCycle++ % 2 == 0)
                 ? PotionEffectType.WEAKNESS : PotionEffectType.BLINDNESS;
+        int effectDuration = Math.max(1, getConfig().getInt("event.hazard-effect-duration-seconds", 40));
         for (Player player : meteorCenter.getWorld().getPlayers()) {
             if (!insideProtectedZone(player.getLocation())) continue;
-            player.addPotionEffect(new PotionEffect(effect, 20 * 40, 0, true, true, true));
+            player.addPotionEffect(new PotionEffect(effect, 20 * effectDuration, 0, true, true, true));
             player.sendMessage(effect == PotionEffectType.WEAKNESS
                     ? "§cМетеорит подавляет вашу силу..."
                     : "§8Пыль метеорита застилает вам глаза...");
@@ -424,7 +429,10 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
 
     private void spawnMeteorGuards() {
         if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
-        int count = BURNING.equals(eventRarity) ? 6 : MOLTEN.equals(eventRarity) ? 4 : 2;
+        int count = BURNING.equals(eventRarity)
+                ? Math.max(0, getConfig().getInt("guards.burning-count", 6))
+                : MOLTEN.equals(eventRarity) ? Math.max(0, getConfig().getInt("guards.molten-count", 4))
+                : Math.max(0, getConfig().getInt("guards.common-count", 2));
         Material armor = BURNING.equals(eventRarity) ? Material.NETHERITE_CHESTPLATE
                 : MOLTEN.equals(eventRarity) ? Material.DIAMOND_CHESTPLATE : Material.IRON_CHESTPLATE;
         Material helmet = BURNING.equals(eventRarity) ? Material.NETHERITE_HELMET
@@ -572,7 +580,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
 
     private boolean isMeteorMaterial(Material material) {
         return material == Material.BLACKSTONE || material == Material.BASALT || material == Material.MAGMA_BLOCK
-                || material == Material.ANCIENT_DEBRIS || material == Material.POLISHED_BASALT;
+                || material == Material.ANCIENT_DEBRIS || material == Material.POLISHED_BASALT
+                || material == Material.COBBLED_DEEPSLATE || material == Material.TUFF;
     }
 
     private void persistMeteorBlocks() {
@@ -1018,7 +1027,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         addDiamondGear(pool, tier);
         addEnchantedBooks(pool, tier);
         addPotionLoot(pool, tier);
-        if (tier >= 2) addSpawnEggs(pool, tier);
+        addSpawnEggs(pool, tier);
         addUtilityAndRareLoot(pool, tier);
         if (tier >= 4) addNetheriteGear(pool);
         return pool.get(random.nextInt(pool.size())).clone();
