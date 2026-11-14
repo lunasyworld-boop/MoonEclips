@@ -1,5 +1,5 @@
 name: MoonHub
-version: 1.21.1b
+version: 1.21.3b
 main: ru.mooneclips.moonhub.MoonHub
 api-version: '1.21'
 author: MoonEclips
