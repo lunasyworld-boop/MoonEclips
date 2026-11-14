@@ -10,7 +10,6 @@ loadbefore:
 softdepend:
   - Vault
   - Essentials
-  - EconomicMoonEclips
 commands:
   mwipe:
     description: MoonWipe administration
