@@ -114,7 +114,7 @@ public final class HubWorldBuilder {
         // PvP arena with a visible perimeter.
         arena(world);
 
-        // Floating approach bridges.
+        // Clear a doorway in the north wall of the mine.\n        for (int x = 52; x <= 58; x++) for (int y = Y + 2; y <= Y + 4; y++)\n            set(world, x, y, -16, Material.AIR);\n\n        // Floating approach bridges.
         bridge(world, -67, Y + 11, -62, -52, Y + 2, -42);
         bridge(world, 67, Y + 12, 62, 30, Y + 2, 50);
 
@@ -125,7 +125,7 @@ public final class HubWorldBuilder {
 
         savePoint("spawn", world, 0.5, Y + 2, 0.5, 180);
         savePoint("top", world, 0.5, Y + 2, -52.5, 0);
-        savePoint("avto", world, 55.5, Y + 2, -22.5, 0);
+        savePoint("avto", world, 55.5, Y + 2, -13.5, 0);
         savePoint("case", world, -52.5, Y + 2, -34.5, 180);
         savePoint("freecase", world, -52.5, Y + 2, -58.5, 0);
         plugin.saveConfig();
