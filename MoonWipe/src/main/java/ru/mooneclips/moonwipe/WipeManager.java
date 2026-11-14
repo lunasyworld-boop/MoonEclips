@@ -216,7 +216,7 @@ public final class WipeManager implements Listener {
         try {
             saveWorldsAndPlayers();
             Path backup = createBackupArchive();
-            sender.sendMessage(msg("&aРезервная копия создана: &f" + plugin.getDataFolder().toPath().relativize(backup)));
+            sender.sendMessage(msg("&aРезервная копия создана: &f" + plugin.getDataFolder().toPath().toAbsolutePath().normalize().relativize(backup.toAbsolutePath().normalize())));
         } catch (Exception ex) {
             sender.sendMessage(msg("&cНе удалось создать резервную копию: &f" + ex.getMessage()));
             plugin.getLogger().severe("MoonWipe backup failed: " + ex.getMessage());
@@ -444,11 +444,12 @@ public final class WipeManager implements Listener {
             return null;
         }
 
-        byte[] originalBytes = Files.readAllBytes(database);
         boolean wasEnabled = auctionPlugin != null && auctionPlugin.isEnabled();
         if (wasEnabled) Bukkit.getPluginManager().disablePlugin(auctionPlugin);
+        byte[] originalBytes = null;
 
         try {
+            originalBytes = Files.readAllBytes(database);
             Class.forName("org.sqlite.JDBC");
             try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
                  Statement statement = connection.createStatement()) {
@@ -471,10 +472,12 @@ public final class WipeManager implements Listener {
             plugin.getLogger().info("Аукцион очищен: listings и item_mail удалены, структура базы сохранена.");
             return new AuctionSnapshot(database, originalBytes, wasEnabled, auctionPlugin);
         } catch (Exception ex) {
-            try {
-                Files.write(database, originalBytes);
-            } catch (IOException restoreError) {
-                plugin.getLogger().severe("Не удалось восстановить auction.db после ошибки: " + restoreError.getMessage());
+            if (originalBytes != null) {
+                try {
+                    Files.write(database, originalBytes);
+                } catch (IOException restoreError) {
+                    plugin.getLogger().severe("Не удалось восстановить auction.db после ошибки: " + restoreError.getMessage());
+                }
             }
             if (wasEnabled && !auctionPlugin.isEnabled()) Bukkit.getPluginManager().enablePlugin(auctionPlugin);
             throw ex;
