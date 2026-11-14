@@ -530,6 +530,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private static final class MenuHolder implements InventoryHolder {
         private final String type;
         private final String rarity;
+        private int page;
         private Inventory inventory;
 
         private MenuHolder(String type, String rarity) {
@@ -610,14 +611,27 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     }
 
     private void openLootMenu(Player player, String rarity) {
-        Inventory inv = createMenu(player, "loot", rarity, 54, "§8Лут — " + rarityName(rarity));
+        openLootMenu(player, rarity, 0);
+    }
+
+    private void openLootMenu(Player player, String rarity, int page) {
         List<ItemStack> items = getLoot(rarity);
-        for (int i = 0; i < Math.min(45, items.size()); i++) inv.setItem(i, items.get(i).clone());
+        int pages = Math.max(1, (items.size() + 44) / 45);
+        int currentPage = Math.max(0, Math.min(page, pages - 1));
+        Inventory inv = createMenu(player, "loot", rarity, 54,
+                "§8Лут — " + rarityName(rarity) + " §7(" + (currentPage + 1) + "/" + pages + ")");
+        ((MenuHolder) inv.getHolder()).page = currentPage;
+        int start = currentPage * 45;
+        for (int i = start; i < Math.min(start + 45, items.size()); i++) {
+            inv.setItem(i - start, items.get(i).clone());
+        }
         inv.setItem(45, button(Material.LIME_DYE, "Добавить предмет из руки",
                 "§7Возьмите предмет в основную руку"));
-        inv.setItem(49, button(Material.SUNFLOWER, "Сгенерировать 20 ценных предметов",
-                "§7Отдельный пул этой редкости; экипировка с зачарованиями"));
-        inv.setItem(53, button(Material.ARROW, "Назад"));
+        inv.setItem(47, button(Material.ARROW, "Предыдущая страница"));
+        inv.setItem(49, button(Material.SUNFLOWER, "Сгенерировать 45 предметов",
+                "§7Добавит разнообразный лут в этот пул"));
+        inv.setItem(51, button(Material.ARROW, "Следующая страница"));
+        inv.setItem(53, button(Material.BARRIER, "Назад"));
     }
 
     private void openPoolMenu(Player player) {
@@ -676,7 +690,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 }
             }
             case "settings" -> handleSettingsClick(player, slot, event.isRightClick());
-            case "loot" -> handleLootClick(player, holder.rarity, slot);
+            case "loot" -> handleLootClick(player, holder.rarity, holder.page, slot);
             case "pool" -> handlePoolClick(player, slot);
             default -> { }
         }
@@ -745,7 +759,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         openSettingsMenu(player);
     }
 
-    private void handleLootClick(Player player, String rarity, int slot) {
+    private void handleLootClick(Player player, String rarity, int page, int slot) {
         List<ItemStack> items = getLoot(rarity);
         if (slot == 45) {
             ItemStack hand = player.getInventory().getItemInMainHand();
@@ -753,32 +767,38 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 player.sendMessage("§cВозьмите предмет в основную руку.");
                 return;
             }
-            if (items.size() >= 45) {
-                player.sendMessage("§cВ списке уже 45 предметов.");
-                return;
-            }
             ItemStack copy = hand.clone();
             copy.setAmount(1);
             items.add(copy);
             saveLoot(rarity, items);
-            openLootMenu(player, rarity);
+            openLootMenu(player, rarity, page);
+            return;
+        }
+        if (slot == 47) {
+            openLootMenu(player, rarity, Math.max(0, page - 1));
             return;
         }
         if (slot == 49) {
-            items.clear();
-            for (int i = 0; i < 20; i++) items.add(generateRandomLootItem(rarity));
+            for (int i = 0; i < 45; i++) items.add(generateRandomLootItem(rarity));
             saveLoot(rarity, items);
-            openLootMenu(player, rarity);
+            openLootMenu(player, rarity, page);
+            return;
+        }
+        if (slot == 51) {
+            openLootMenu(player, rarity, page + 1);
             return;
         }
         if (slot == 53) {
             openMainMenu(player);
             return;
         }
-        if (slot >= 0 && slot < 45 && slot < items.size()) {
-            items.remove(slot);
-            saveLoot(rarity, items);
-            openLootMenu(player, rarity);
+        if (slot >= 0 && slot < 45) {
+            int index = page * 45 + slot;
+            if (index < items.size()) {
+                items.remove(index);
+                saveLoot(rarity, items);
+                openLootMenu(player, rarity, page);
+            }
         }
     }
 
@@ -834,6 +854,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         addValuableBasics(pool, tier);
         addDiamondGear(pool, tier);
         if (tier >= 2) addSpawnEggs(pool, tier);
+        addUtilityAndRareLoot(pool, tier);
         if (tier >= 4) addNetheriteGear(pool);
         return pool.get(random.nextInt(pool.size())).clone();
     }
@@ -893,6 +914,48 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         for (String name : eggs) {
             Material material = Material.matchMaterial(name);
             if (material != null) pool.add(new ItemStack(material));
+        }
+    }
+
+    private void addUtilityAndRareLoot(List<ItemStack> pool, int tier) {
+        // Разнообразные боевые и исследовательские предметы.
+        addEnchanted(pool, Material.BOW, Enchantment.POWER, tier >= 4 ? 6 : tier >= 2 ? 4 : 3,
+                Enchantment.UNBREAKING, tier + 1, Enchantment.FLAME, 1);
+        addEnchanted(pool, Material.CROSSBOW, Enchantment.PIERCING, tier >= 4 ? 5 : 3,
+                Enchantment.QUICK_CHARGE, 3, Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.TRIDENT, Enchantment.IMPALING, tier >= 4 ? 6 : 4,
+                Enchantment.LOYALTY, 3, Enchantment.UNBREAKING, tier + 1);
+        add(pool, Material.ARROW, tier >= 2 ? 16 : 8);
+        add(pool, Material.GOLDEN_CARROT, 2);
+        add(pool, Material.EXPERIENCE_BOTTLE, tier >= 4 ? 12 : 6);
+        if (tier >= 2) {
+            add(pool, Material.TNT, 2);
+            add(pool, Material.ENDER_PEARL, 4);
+            add(pool, Material.BLAZE_ROD, 3);
+            add(pool, Material.GHAST_TEAR, 2);
+            add(pool, Material.PHANTOM_MEMBRANE, 2);
+            add(pool, Material.HEART_OF_THE_SEA, 1);
+            add(pool, Material.NAUTILUS_SHELL, 2);
+            add(pool, Material.PRISMARINE_CRYSTALS, 6);
+            add(pool, Material.SHULKER_SHELL, 2);
+            add(pool, Material.DRAGON_BREATH, 2);
+            add(pool, Material.WIND_CHARGE, 4);
+            addEnchanted(pool, Material.MACE, Enchantment.DENSITY, 4,
+                    Enchantment.UNBREAKING, 3);
+        }
+        if (tier >= 4) {
+            add(pool, Material.NETHER_STAR, 1);
+            add(pool, Material.DRAGON_EGG, 1);
+            add(pool, Material.TOTEM_OF_UNDYING, 2);
+            add(pool, Material.ENCHANTED_GOLDEN_APPLE, 2);
+            add(pool, Material.HEAVY_CORE, 1);
+            add(pool, Material.TRIDENT, 1);
+            addEnchanted(pool, Material.MACE, Enchantment.DENSITY, 5,
+                    Enchantment.BREACH, 4, Enchantment.WIND_BURST, 3,
+                    Enchantment.UNBREAKING, 4);
+            addEnchanted(pool, Material.BOW, Enchantment.POWER, 7,
+                    Enchantment.PUNCH, 2, Enchantment.FLAME, 1,
+                    Enchantment.INFINITY, 1);
         }
     }
 
