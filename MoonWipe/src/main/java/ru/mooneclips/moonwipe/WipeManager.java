@@ -479,7 +479,12 @@ public final class WipeManager implements Listener {
                 }
                 connection.commit();
             }
-            if (wasEnabled) Bukkit.getPluginManager().enablePlugin(auctionPlugin);
+            if (wasEnabled) {
+                Bukkit.getPluginManager().enablePlugin(auctionPlugin);
+                if (!auctionPlugin.isEnabled()) {
+                    throw new IllegalStateException("EconomicMoonEclips не смог повторно включиться после очистки аукциона.");
+                }
+            }
             plugin.getLogger().info("Аукцион очищен: listings и item_mail удалены, структура базы сохранена.");
             return new AuctionSnapshot(database, originalBytes, wasEnabled, auctionPlugin);
         } catch (Exception ex) {
