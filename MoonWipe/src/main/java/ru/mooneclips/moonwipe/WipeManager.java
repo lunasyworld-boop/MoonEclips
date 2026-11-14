@@ -267,8 +267,8 @@ public final class WipeManager implements Listener {
             Path backup = createBackupArchive();
             plugin.getLogger().info("Резервная копия перед вайпом: " + backup);
 
-            updateLevelName(newWorldName);
             levelNameChanged = true;
+            updateLevelName(newWorldName);
 
             if (plugin.getConfig().getBoolean("settings.reset-economy", true)) {
                 balances = resetBalances();
