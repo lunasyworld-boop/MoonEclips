@@ -1,0 +1,5 @@
+world: world
+min-radius: 500
+max-radius: 5000
+max-attempts: 24
+cooldown-seconds: 30
