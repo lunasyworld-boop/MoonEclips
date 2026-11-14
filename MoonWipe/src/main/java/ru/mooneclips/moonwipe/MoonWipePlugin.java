@@ -84,11 +84,7 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
         getCommand("mwipe").setExecutor(this);
         getServer().getPluginManager().registerEvents(this, this);
 
-        if (getConfig().getBoolean("wipe.reset-money", true)) {
-            getServer().getScheduler().runTask(this, this::finishPendingWipe);
-        } else {
-            finishPendingWipe();
-        }
+        getServer().getScheduler().runTask(this, this::finishPendingWipe);
 
         loadSchedule();
         scheduleTask = getServer().getScheduler().runTaskTimer(this, this::tickSchedule, 20L, 20L);
@@ -296,9 +292,11 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
     private void clearSqliteDatabase(Path database) throws Exception {
         Class.forName("org.sqlite.JDBC");
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
+            try (Statement pragma = connection.createStatement()) {
+                pragma.execute("PRAGMA foreign_keys=OFF");
+            }
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
-                statement.execute("PRAGMA foreign_keys=OFF");
                 List<String> tables = new ArrayList<>();
                 try (ResultSet result = statement.executeQuery(
                         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")) {
@@ -311,7 +309,11 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
                     statement.executeUpdate("DELETE FROM " + quoted);
                 }
                 connection.commit();
-                statement.execute("PRAGMA integrity_check");
+                try (ResultSet integrity = statement.executeQuery("PRAGMA integrity_check")) {
+                    if (!integrity.next() || !"ok".equalsIgnoreCase(integrity.getString(1))) {
+                        throw new IllegalStateException("SQLite integrity_check did not return ok");
+                    }
+                }
             } catch (Exception exception) {
                 connection.rollback();
                 throw exception;
@@ -398,10 +400,33 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
             }
         }
 
-        if (getConfig().getBoolean("backup.enabled", true)) {
-            send(sender, "&eПодготавливаю вайп: сохраняю миры и отключаю игроков...");
-            Bukkit.broadcastMessage(color(prefix() + "&eНачалась подготовка полного вайпа. Игроки будут отключены."));
+        if (!getConfig().getBoolean("backup.enabled", true)) {
+            wipeInProgress.set(false);
+            send(sender, "&cВайп запрещён: резервное копирование отключено. Включи backup.enabled.");
+            return;
         }
+        if (getConfig().getBoolean("wipe.reset-auction-database", true)) {
+            try {
+                resolveSafeAuctionDatabase(serverRoot(),
+                        getConfig().getString("wipe.auction-database", "plugins/EconomicMoonEclips/auction.db"));
+            } catch (Exception exception) {
+                wipeInProgress.set(false);
+                send(sender, "&cНеверный путь базы аукциона: " + exception.getMessage());
+                return;
+            }
+        }
+        for (String extra : getConfig().getStringList("wipe.extra-data-paths")) {
+            try {
+                resolveSafeExtraPath(serverRoot(), extra);
+            } catch (Exception exception) {
+                wipeInProgress.set(false);
+                send(sender, "&cНебезопасный дополнительный путь '" + extra + "': " + exception.getMessage());
+                return;
+            }
+        }
+
+        send(sender, "&eПодготавливаю вайп: сохраняю миры и отключаю игроков...");
+        Bukkit.broadcastMessage(color(prefix() + "&eНачалась подготовка полного вайпа. Игроки будут отключены."));
 
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             world.save();
@@ -578,9 +603,21 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
 
     private Path resolveSafeExtraPath(Path root, String relative) throws IOException {
         Path target = root.resolve(relative).normalize();
-        if (!target.startsWith(root.resolve("plugins")) || target.startsWith(getDataFolder().toPath().toAbsolutePath().normalize())
-                || relative.contains("..")) {
-            throw new IOException("extra data path must stay inside a plugin data folder and cannot target MoonWipe itself");
+        Path plugins = root.resolve("plugins").normalize();
+        if (!target.startsWith(plugins) || target.equals(plugins) || relative.contains("..")) {
+            throw new IOException("extra data path must stay inside a plugin data folder");
+        }
+        Path relativeToPlugins = plugins.relativize(target);
+        if (relativeToPlugins.getNameCount() < 2) {
+            throw new IOException("extra path must target a file/subfolder inside a plugin data folder, not the plugin root");
+        }
+        String pluginFolder = relativeToPlugins.getName(0).toString().toLowerCase(Locale.ROOT);
+        if (Set.of("luckperms", "moonwipe", "essentials", "economicmooneclips", "worldedit").contains(pluginFolder)) {
+            throw new IOException("protected plugin data folder cannot be added to extra-data-paths: " + pluginFolder);
+        }
+        String filename = target.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (Set.of("config.yml", "settings.yml", "plugin.yml").contains(filename) || filename.endsWith(".jar")) {
+            throw new IOException("configuration and plugin jar files are protected");
         }
         return target;
     }
