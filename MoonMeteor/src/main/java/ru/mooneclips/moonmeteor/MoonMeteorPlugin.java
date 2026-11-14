@@ -105,6 +105,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             return true;
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
+            case "menu" -> openMainMenu(player);
             case "start" -> startEvent(player);
             case "stop" -> stopEvent("§cСобытие метеорита остановлено администратором.");
             case "reload" -> {
@@ -112,7 +113,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 player.sendMessage("§aКонфигурация MoonMeteor перезагружена.");
                 scheduleNextAutomaticStart();
             }
-            default -> player.sendMessage("§eИспользование: /moonmeteor [start|stop|reload]");
+            default -> player.sendMessage("§eИспользование: /moonmeteor [menu|start|stop|reload]");
         }
         return true;
     }
@@ -179,21 +180,35 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private void buildMeteorite() {
         meteorBlocks.clear();
         World world = meteorCenter.getWorld();
-        int[] radii = {5, 5, 4, 3, 2};
+        // Диаметр 13 блоков: максимальный радиус 6.
+        int[] radii = {6, 6, 5, 4, 3, 2, 1};
         Material[] palette = {Material.BLACKSTONE, Material.BASALT, Material.MAGMA_BLOCK,
                 Material.ANCIENT_DEBRIS, Material.POLISHED_BASALT};
-        for (int y = 0; y < radii.length; y++) {
-            int radius = radii[y];
+
+        // Формируем корпус метеорита с центральным отверстием 3x3.
+        for (int layer = 0; layer < radii.length; layer++) {
+            int radius = radii[layer];
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (dx * dx + dz * dz > radius * radius) continue;
                     if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) continue;
-                    Block block = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + y,
+                    Block block = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + layer,
                             meteorCenter.getBlockZ() + dz);
                     if (!block.getType().isAir()) continue;
                     block.setType(palette[random.nextInt(palette.length)], false);
                     meteorBlocks.add(block.getLocation());
                 }
+            }
+        }
+
+        // Сплошное дно ямы из блоков метеорита на уровне baseY + 1.
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                Block floor = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + 1,
+                        meteorCenter.getBlockZ() + dz);
+                if (!floor.getType().isAir()) continue;
+                floor.setType(Material.ANCIENT_DEBRIS, false);
+                meteorBlocks.add(floor.getLocation());
             }
         }
         persistMeteorBlocks();
@@ -208,12 +223,14 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
         int max = Math.max(min, getConfig().getInt("random-loot.max-amount", 3));
         stack.setAmount(min == max ? min : min + random.nextInt(max - min + 1));
-        Location spawn = meteorCenter.clone().add((random.nextDouble() - 0.5) * 1.2, 5.0,
-                (random.nextDouble() - 0.5) * 1.2);
+        // Предмет появляется внутри ямы и выстреливает вверх, затем разлетается в стороны.
+        Location spawn = meteorCenter.clone().add((random.nextDouble() - 0.5) * 0.45, 2.0,
+                (random.nextDouble() - 0.5) * 0.45);
         Item item = meteorCenter.getWorld().dropItem(spawn, stack);
         item.setPickupDelay(0);
-        item.setVelocity(new Vector((random.nextDouble() - 0.5) * 0.12, -0.08,
-                (random.nextDouble() - 0.5) * 0.12));
+        item.setVelocity(new Vector((random.nextDouble() - 0.5) * 0.55,
+                0.48 + random.nextDouble() * 0.28,
+                (random.nextDouble() - 0.5) * 0.55));
         item.getPersistentDataContainer().set(dropKey, PersistentDataType.BYTE, (byte) 1);
         String itemName = stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()
                 ? stack.getItemMeta().getDisplayName() : prettify(stack.getType());
