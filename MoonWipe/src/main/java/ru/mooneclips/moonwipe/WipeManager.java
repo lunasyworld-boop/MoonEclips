@@ -294,11 +294,9 @@ public final class WipeManager implements Listener {
         boolean levelNameChanged = false;
 
         try {
-            if (!plugin.getConfig().getBoolean("settings.reset-worlds", true)) {
-                throw new IllegalStateException("Очистка миров выключена в конфигурации; полный вайп отменён.");
-            }
+            boolean resetWorlds = plugin.getConfig().getBoolean("settings.reset-worlds", true);
             String newWorldName = validateWorldName(plugin.getConfig().getString("settings.new-world-name", "world"));
-            List<String> worldFolders = collectWorldFolderNames(newWorldName);
+            List<String> worldFolders = resetWorlds ? collectWorldFolderNames(newWorldName) : List.of();
             if (!plugin.getConfig().getBoolean("backup.enabled", true)) {
                 throw new IllegalStateException("Резервное копирование отключено; безопасный вайп отменён.");
             }
@@ -321,8 +319,10 @@ public final class WipeManager implements Listener {
             Path backup = createBackupArchive();
             plugin.getLogger().info("Резервная копия перед вайпом: " + backup);
 
-            levelNameChanged = true;
-            updateLevelName(newWorldName);
+            if (resetWorlds) {
+                levelNameChanged = true;
+                updateLevelName(newWorldName);
+            }
 
             if (plugin.getConfig().getBoolean("settings.reset-economy", true)) {
                 balances = resetBalances();
@@ -333,7 +333,7 @@ public final class WipeManager implements Listener {
                 auctionSnapshot = clearAuctionDatabase();
             }
 
-            writePendingWipe(newWorldName, worldFolders);
+            if (resetWorlds) writePendingWipe(newWorldName, worldFolders);
             Bukkit.broadcastMessage(msg("&aДанные вайпа подготовлены. Сервер сейчас штатно остановится."));
             Bukkit.getScheduler().runTaskLater(plugin, Bukkit::shutdown, 20L);
         } catch (Exception ex) {
