@@ -190,6 +190,7 @@ public final class WipeManager implements Listener {
         try {
             DayOfWeek day = DayOfWeek.valueOf(rawDay.toUpperCase(Locale.ROOT));
             LocalTime time = LocalTime.parse(rawTime);
+            plugin.getConfig().set("schedule.mode", "weekly");
             plugin.getConfig().set("schedule.day", day.name());
             plugin.getConfig().set("schedule.time", String.format(Locale.ROOT, "%02d:%02d", time.getHour(), time.getMinute()));
             plugin.getConfig().set("schedule.enabled", true);
@@ -295,6 +296,11 @@ public final class WipeManager implements Listener {
 
         try {
             boolean resetWorlds = plugin.getConfig().getBoolean("settings.reset-worlds", true);
+            boolean resetEconomy = plugin.getConfig().getBoolean("settings.reset-economy", true);
+            boolean resetAuction = plugin.getConfig().getBoolean("settings.reset-auction", true);
+            if (!resetWorlds && !resetEconomy && !resetAuction) {
+                throw new IllegalStateException("Не выбрано ни одного модуля для сброса.");
+            }
             String newWorldName = validateWorldName(plugin.getConfig().getString("settings.new-world-name", "world"));
             List<String> worldFolders = resetWorlds ? collectWorldFolderNames(newWorldName) : List.of();
             if (!plugin.getConfig().getBoolean("backup.enabled", true)) {
