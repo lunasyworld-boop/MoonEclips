@@ -94,17 +94,18 @@ public final class MoonRTP extends JavaPlugin {
 
     private Location findSafeLocation(World world, int x, int z) {
         int y = world.getHighestBlockYAt(x, z);
-        if (y <= world.getMinHeight() || y + 2 >= world.getMaxHeight()) return null;
+        if (y <= world.getMinHeight() || y + 3 >= world.getMaxHeight()) return null;
 
-        Block floor = world.getBlockAt(x, y - 1, z);
-        Block feet = world.getBlockAt(x, y, z);
-        Block head = world.getBlockAt(x, y + 1, z);
+        Block floor = world.getBlockAt(x, y, z);
+        Block feet = world.getBlockAt(x, y + 1, z);
+        Block head = world.getBlockAt(x, y + 2, z);
 
-        if (!floor.getType().isSolid() || isDangerous(floor.getType())) return null;
+        if (!floor.getType().isSolid() || floor.isLiquid() || isDangerous(floor.getType())
+                || floor.getType().name().endsWith("_LEAVES")) return null;
         if (!feet.isPassable() || !head.isPassable()) return null;
         if (feet.isLiquid() || head.isLiquid()) return null;
 
-        return new Location(world, x + 0.5, y, z + 0.5,
+        return new Location(world, x + 0.5, y + 1.0, z + 0.5,
                 random.nextFloat() * 360.0f, 0.0f);
     }
 
