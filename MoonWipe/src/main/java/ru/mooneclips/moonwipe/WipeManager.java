@@ -157,37 +157,46 @@ public final class WipeManager implements Listener {
                     ? ZoneId.systemDefault() : ZoneId.of(zoneName);
             ZonedDateTime now = ZonedDateTime.now(zone);
             LocalTime time = LocalTime.parse(plugin.getConfig().getString("schedule.time", "14:00"));
+            long missedGraceSeconds = Math.max(5L,
+                    plugin.getConfig().getLong("schedule.missed-run-grace-seconds", 300L));
+
+            boolean once = plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once");
             ZonedDateTime target;
-            if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
+            if (once) {
                 LocalDate date = LocalDate.parse(plugin.getConfig().getString("schedule.date", LocalDate.now(zone).toString()));
                 target = ZonedDateTime.of(date, time, zone);
-                if (target.isBefore(now.minusSeconds(1))) return;
+                if (target.isBefore(now.minusSeconds(missedGraceSeconds))) {
+                    plugin.getLogger().warning("Одноразовое расписание MoonWipe просрочено больше допустимого окна; оно отключено без выполнения вайпа.");
+                    plugin.getConfig().set("schedule.enabled", false);
+                    plugin.saveConfig();
+                    return;
+                }
             } else {
                 DayOfWeek day = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.day", "SATURDAY").toUpperCase(Locale.ROOT));
                 target = now.with(TemporalAdjusters.nextOrSame(day)).with(time);
-                if (target.toLocalDate().isBefore(now.toLocalDate()) || target.isBefore(now.minusSeconds(1))) target = target.plusWeeks(1);
+                if (target.isBefore(now.minusSeconds(missedGraceSeconds))) target = target.plusWeeks(1);
             }
-            int configuredCountdown = Math.max(5, plugin.getConfig().getInt("settings.countdown-seconds", 60));
-            ZonedDateTime start = target.minusSeconds(configuredCountdown);
+
+            ZonedDateTime start = target.minusSeconds(Math.max(5,
+                    plugin.getConfig().getInt("settings.countdown-seconds", 60)));
             String lastRun = plugin.getConfig().getString("schedule.last-run", "");
             String runKey = target.toLocalDate().toString() + "@" + target.toLocalTime();
             if (lastRun.equals(runKey)) return;
-            long missedGraceSeconds = Math.max(5L,
-                    plugin.getConfig().getLong("schedule.missed-run-grace-seconds", 300L));
+
             if (!now.isBefore(start) && !now.isAfter(target.plusSeconds(missedGraceSeconds))) {
                 plugin.getConfig().set("schedule.last-run", runKey);
-                if (plugin.getConfig().getString("schedule.mode", "weekly").equalsIgnoreCase("once")) {
-                    plugin.getConfig().set("schedule.enabled", false);
-                }
+                if (once) plugin.getConfig().set("schedule.enabled", false);
                 plugin.saveConfig();
+
                 long seconds = Math.max(0L, Duration.between(now, target).getSeconds());
                 if (seconds == 0L && now.isAfter(target)) {
-                    plugin.getLogger().warning("MoonWipe: время расписания было пропущено из-за задержки сервера; запускаю вайп сразу в пределах допустимого окна.");
+                    plugin.getLogger().warning("MoonWipe: время расписания было пропущено из-за задержки или перезапуска сервера; запускаю вайп сразу в пределах допустимого окна.");
                 }
                 startCountdown((int) Math.min(Integer.MAX_VALUE, seconds), "Расписание");
             }
         } catch (Exception ex) {
-            plugin.getLogger().warning("Не удалось проверить расписание MoonWipe: " + ex.getMessage());
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Не удалось проверить расписание MoonWipe. Проверьте schedule.time, schedule.day и schedule.timezone.", ex);
         }
     }
 
