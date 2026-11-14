@@ -1,0 +1,17 @@
+name: MoonWipe
+version: 1.0.0
+main: ru.mooneclips.moonwipe.MoonWipePlugin
+api-version: '1.21'
+load: POSTWORLD
+author: MoonEclips
+softdepend: [Vault, Essentials, EconomicMoonEclips, LuckPerms]
+description: Безопасный ручной и автоматический полный вайп MoonEclips.
+commands:
+  mwipe:
+    description: Управление вайпом MoonEclips
+    usage: /mwipe [start|confirm|cancel|backup|schedule|status|reload]
+    permission: moonwipe.admin
+permissions:
+  moonwipe.admin:
+    description: Полное управление MoonWipe
+    default: op
