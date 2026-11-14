@@ -5,13 +5,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -104,7 +102,7 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
                 reloadConfig();
                 sender.sendMessage(msg("Настройки перезагружены."));
             }
-            case "help" -> sender.sendMessage("§dMoonHub §7— /moonhub gui, /moonhub set <точка>, /moonhub pos1 <регион>, /moonhub pos2 <регион>, /moonhub region <регион> <safe|mine|pvp>, /moonhub reload"));
+            case "help" -> sender.sendMessage("§dMoonHub §7— /moonhub gui, /moonhub set <точка>, /moonhub pos1 <регион>, /moonhub pos2 <регион>, /moonhub region <регион> <safe|mine|pvp>, /moonhub reload");
             default -> sender.sendMessage(msg("Неизвестная команда. Используй /moonhub help."));
         }
         return true;
@@ -118,8 +116,8 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
         String id = safeId(args[1]);
         Location a = pos1.get(player.getUniqueId());
         Location b = pos2.get(player.getUniqueId());
-        if (a == null || b == null || !Objects.equals(a.getWorld(), b.getWorld())) {
-            player.sendMessage(msg("Сначала задай обе точки в одном мире: /moonhub pos1 " + id + " и /moonhub pos2 " + id));
+        if (id.isBlank() || a == null || b == null || !Objects.equals(a.getWorld(), b.getWorld())) {
+            player.sendMessage(msg("Сначала задай две точки в одном мире: /moonhub pos1 " + id + " и /moonhub pos2 " + id));
             return;
         }
         String mode = args[2].toLowerCase(Locale.ROOT);
@@ -144,22 +142,22 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
         HubMenuHolder holder = new HubMenuHolder();
         Inventory inv = Bukkit.createInventory(holder, 36, Component.text(MENU_TITLE));
         holder.inventory = inv;
-        inv.setItem(10, item(Material.RESPAWN_ANCHOR, "§dГлавный спавн", "§7ЛКМ — сохранить текущую точку", "§7Команда игроков: /spawn"));
-        inv.setItem(12, item(Material.WRITABLE_BOOK, "§dТаблицы топа", "§7ЛКМ — сохранить точку топов", "§7Команда игроков: /top"));
-        inv.setItem(14, item(Material.DIAMOND_PICKAXE, "§dАвтошахта", "§7ЛКМ — сохранить вход в шахту", "§7Команда игроков: /avto"));
-        inv.setItem(16, item(Material.ENDER_CHEST, "§dОбычные кейсы", "§7ЛКМ — сохранить точку кейсов", "§7Команда игроков: /case"));
-        inv.setItem(22, item(Material.CHEST, "§dБесплатный кейс", "§7ЛКМ — сохранить точку", "§7Команда игроков: /freecase"));
-        inv.setItem(30, item(Material.SHIELD, "§bЗащита регионов", "§7Выдели две точки командами:", "§f/moonhub pos1 <имя>", "§f/moonhub pos2 <имя>", "§7Создай регион:", "§f/moonhub region <имя> <safe|mine|pvp>"));
-        inv.setItem(32, item(Material.REDSTONE, "§eПерезагрузить настройки", "§7Перечитать config.yml"));
+        inv.setItem(10, item(Material.RESPAWN_ANCHOR, "Главный спавн", "ЛКМ — сохранить текущую точку", "Команда игроков: /spawn"));
+        inv.setItem(12, item(Material.WRITABLE_BOOK, "Таблицы топа", "ЛКМ — сохранить точку топов", "Команда игроков: /top"));
+        inv.setItem(14, item(Material.DIAMOND_PICKAXE, "Автошахта", "ЛКМ — сохранить вход в шахту", "Команда игроков: /avto"));
+        inv.setItem(16, item(Material.ENDER_CHEST, "Обычные кейсы", "ЛКМ — сохранить точку кейсов", "Команда игроков: /case"));
+        inv.setItem(22, item(Material.CHEST, "Бесплатный кейс", "ЛКМ — сохранить точку", "Команда игроков: /freecase"));
+        inv.setItem(30, item(Material.SHIELD, "Защита регионов", "Выдели две точки командами:", "/moonhub pos1 <имя>", "/moonhub pos2 <имя>", "Создай регион:", "/moonhub region <имя> <safe|mine|pvp>"));
+        inv.setItem(32, item(Material.REDSTONE, "Перезагрузить настройки", "Перечитать config.yml"));
         player.openInventory(inv);
     }
 
     private ItemStack item(Material material, String name, String... lore) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(ChatColor.stripColor(name)));
+        meta.displayName(Component.text(name));
         List<Component> lines = new ArrayList<>();
-        for (String line : lore) lines.add(Component.text(ChatColor.stripColor(line)));
+        for (String line : lore) lines.add(Component.text(line));
         meta.lore(lines);
         stack.setItemMeta(meta);
         return stack;
@@ -192,12 +190,12 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
     }
 
     private void teleport(Player player, String point) {
-        if (getConfig().getLocation("points." + point) == null) {
+        Location target = getConfig().getLocation("points." + point);
+        if (target == null) {
             player.sendMessage(msg("Точка " + point + " ещё не настроена. Обратись к администрации."));
             return;
         }
-        Location target = getConfig().getLocation("points." + point);
-        if (target == null || target.getWorld() == null) {
+        if (target.getWorld() == null) {
             player.sendMessage(msg("Мир для точки " + point + " не загружен."));
             return;
         }
@@ -230,18 +228,18 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
     @EventHandler
     public void onPlace(BlockPlaceEvent event) {
         Region region = findRegion(event.getBlock().getLocation());
-        if (region != null && !region.mode.equals("mine") && !event.getPlayer().hasPermission("moonhub.bypass")) {
+        if (region != null && !event.getPlayer().hasPermission("moonhub.bypass")) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(msg("Строительство в этой зоне запрещено."));
-        } else if (region != null && region.mode.equals("mine") && !event.getPlayer().hasPermission("moonhub.bypass")) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(msg("В автошахте нельзя устанавливать блоки."));
+            event.getPlayer().sendMessage(msg(region.mode.equals("mine")
+                    ? "В автошахте нельзя устанавливать блоки."
+                    : "Строительство в этой зоне запрещено."));
         }
     }
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
-        Region region = findRegion(event.getClickedBlock() == null ? event.getPlayer().getLocation() : event.getClickedBlock().getLocation());
+        Location at = event.getClickedBlock() == null ? event.getPlayer().getLocation() : event.getClickedBlock().getLocation();
+        Region region = findRegion(at);
         if (region != null && region.mode.equals("safe") && !event.getPlayer().hasPermission("moonhub.bypass")) {
             if (event.getClickedBlock() != null && event.getClickedBlock().getType().isInteractable()) {
                 event.setCancelled(true);
@@ -252,8 +250,7 @@ public final class MoonHub extends JavaPlugin implements Listener, CommandExecut
     @EventHandler
     public void onPvp(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player victim)) return;
-        Player attacker = event.getDamager() instanceof Player p ? p : null;
-        if (attacker == null) return;
+        if (!(event.getDamager() instanceof Player attacker)) return;
         Region victimRegion = findRegion(victim.getLocation());
         Region attackerRegion = findRegion(attacker.getLocation());
         if (victimRegion == null && attackerRegion == null) return;
