@@ -66,6 +66,10 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
+            case "menu" -> {
+                if (sender instanceof Player player) wipeMenu.openMain(player);
+                else sendHelp(sender);
+            }
             case "start" -> {
                 wipeManager.armConfirmation();
                 if (sender instanceof Player player) {
@@ -101,7 +105,7 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("start", "confirm", "cancel", "backup", "schedule", "status", "reload"), args[0]);
+            return filter(List.of("menu", "start", "confirm", "cancel", "backup", "schedule", "status", "reload"), args[0]);
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("schedule")) {
             return filter(List.of("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY", "off"), args[1]);
@@ -120,7 +124,7 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(color("&8&m──────── &5Moon&bWipe &8• &fКоманды &8&m────────"));
-        sender.sendMessage(color("&b/mwipe &7— открыть меню"));
+        sender.sendMessage(color("&b/mwipe menu &7— открыть меню управления"));
         sender.sendMessage(color("&b/mwipe start &7— подготовить ручной вайп"));
         sender.sendMessage(color("&b/mwipe confirm &7— подтвердить вайп"));
         sender.sendMessage(color("&b/mwipe cancel &7— отменить обратный отсчёт"));
