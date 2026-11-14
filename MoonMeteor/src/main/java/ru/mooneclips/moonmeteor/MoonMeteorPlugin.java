@@ -190,7 +190,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                     if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) continue;
                     Block block = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + y,
                             meteorCenter.getBlockZ() + dz);
-                    if (!block.getType().isAir() && !block.isPassable()) continue;
+                    if (!block.getType().isAir()) continue;
                     block.setType(palette[random.nextInt(palette.length)], false);
                     meteorBlocks.add(block.getLocation());
                 }
@@ -401,7 +401,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         if (insideProtectedZone(event.getBlock().getLocation()) || event.getBlocks().stream()
-                .anyMatch(block -> insideProtectedZone(block.getLocation().add(event.getDirection())))) {
+                .anyMatch(block -> insideProtectedZone(block.getRelative(event.getDirection()).getLocation()))) {
             event.setCancelled(true);
         }
     }
@@ -409,7 +409,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPistonRetract(BlockPistonRetractEvent event) {
         if (insideProtectedZone(event.getBlock().getLocation()) || event.getBlocks().stream()
-                .anyMatch(block -> insideProtectedZone(block.getLocation().subtract(event.getDirection())))) {
+                .anyMatch(block -> insideProtectedZone(block.getRelative(event.getDirection().getOppositeFace()).getLocation()))) {
             event.setCancelled(true);
         }
     }
