@@ -1,0 +1,22 @@
+name: Moonscoreboards
+version: 1.3.0-beta
+main: ru.mooneclips.moonscoreboards.MoonScoreboardsPlugin
+api-version: '1.21'
+author: MoonEclips
+softdepend: [Vault, LuckPerms, EconomicMoonEclips]
+commands:
+  stats:
+    description: Открыть собственную статистику
+    usage: /stats
+    permission: moonscoreboards.use
+  pstats:
+    description: Просмотреть статистику игрока (администратор)
+    usage: /pstats <ник>
+    permission: moonscoreboards.admin
+permissions:
+  moonscoreboards.use:
+    description: Просмотр собственного профиля
+    default: true
+  moonscoreboards.admin:
+    description: Просмотр профилей любых игроков
+    default: op
