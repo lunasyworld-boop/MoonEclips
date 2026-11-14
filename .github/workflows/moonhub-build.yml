@@ -20,6 +20,6 @@ jobs:
         run: mvn -B clean package
       - uses: actions/upload-artifact@v4
         with:
-          name: MoonHub-1.21.1b
-          path: MoonHub/target/MoonHub-1.21.1b.jar
+          name: MoonHub-1.21.3b
+          path: MoonHub/target/MoonHub-1.21.3b.jar
           if-no-files-found: error
