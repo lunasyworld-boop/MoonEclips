@@ -387,3 +387,4 @@ public final class MoonScoreboardsPlugin extends JavaPlugin implements Listener,
         private static final OfflineStats EMPTY = new OfflineStats(0, 0, 0);
     }
 }
+// Trigger CI build for 1.3.0-beta.
