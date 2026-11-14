@@ -1138,6 +1138,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         add(pool, Material.DIAMOND, tier == 1 ? 5 : 9);
         add(pool, Material.EMERALD, tier == 1 ? 3 : 8);
         add(pool, Material.GOLD_INGOT, 4);
+        add(pool, Material.IRON_INGOT, 4);
         add(pool, Material.IRON_NUGGET, 8);
         add(pool, Material.GOLD_NUGGET, 6);
         add(pool, Material.RAW_IRON, 3);
@@ -1151,8 +1152,18 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         add(pool, Material.GOLD_ORE, 2);
         add(pool, Material.DEEPSLATE_GOLD_ORE, 2);
         add(pool, Material.COAL, 5);
+        add(pool, Material.COAL_ORE, 2);
+        add(pool, Material.DEEPSLATE_COAL_ORE, 2);
         add(pool, Material.LAPIS_LAZULI, 4);
+        add(pool, Material.LAPIS_ORE, 2);
+        add(pool, Material.DEEPSLATE_LAPIS_ORE, 2);
         add(pool, Material.REDSTONE, 5);
+        add(pool, Material.REDSTONE_ORE, 2);
+        add(pool, Material.DEEPSLATE_REDSTONE_ORE, 2);
+        add(pool, Material.DIAMOND_ORE, 2);
+        add(pool, Material.DEEPSLATE_DIAMOND_ORE, 2);
+        add(pool, Material.EMERALD_ORE, 2);
+        add(pool, Material.DEEPSLATE_EMERALD_ORE, 2);
         add(pool, Material.RAW_IRON_BLOCK, 1);
         add(pool, Material.RAW_GOLD_BLOCK, 1);
         add(pool, Material.RAW_COPPER_BLOCK, 1);
@@ -1311,7 +1322,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private void addPotion(List<ItemStack> pool, PotionType base, PotionEffect custom) {
         ItemStack potion = new ItemStack(Material.POTION);
         PotionMeta meta = (PotionMeta) potion.getItemMeta();
-        if (base != null) meta.setBasePotionType(base);
+        meta.setBasePotionType(base == null ? PotionType.WATER : base);
         if (custom != null) meta.addCustomEffect(custom, true);
         potion.setItemMeta(meta);
         pool.add(potion);
