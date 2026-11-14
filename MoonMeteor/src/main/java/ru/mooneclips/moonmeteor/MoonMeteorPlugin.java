@@ -21,7 +21,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.event.EventHandler;
@@ -61,6 +60,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
