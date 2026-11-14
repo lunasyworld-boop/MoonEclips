@@ -1,0 +1,34 @@
+# MoonWipe 1.0.0 — Paper 1.21.4 / Java 21
+settings:
+  new-world-name: world
+  countdown-seconds: 60
+  reset-economy: true
+  reset-auction: true
+  reset-worlds: true
+
+backup:
+  enabled: true
+  directory: backups
+  include-worlds: true
+  include-essentials-userdata: true
+  include-auction-database: true
+
+worlds:
+  # Дополнительные папки миров, которые нужно очистить (имена папок в корне сервера).
+  additional: []
+
+auction:
+  plugin-folder: EconomicMoonEclips
+  config-file: auction.yml
+  default-database-file: auction.db
+
+schedule:
+  enabled: false
+  day: SATURDAY
+  time: "14:00"
+  timezone: system
+  # Запуск пока выключен, пока администратор не включит расписание.
+  last-run: ""
+
+messages:
+  prefix: "&8[&5Moon&bWipe&8] "
