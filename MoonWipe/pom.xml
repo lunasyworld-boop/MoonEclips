@@ -40,12 +40,6 @@
           <execution><phase>package</phase><goals><goal>shade</goal></goals>
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
-              <relocations>
-                <relocation>
-                  <pattern>org.sqlite</pattern>
-                  <shadedPattern>ru.mooneclips.moonwipe.lib.sqlite</shadedPattern>
-                </relocation>
-              </relocations>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
