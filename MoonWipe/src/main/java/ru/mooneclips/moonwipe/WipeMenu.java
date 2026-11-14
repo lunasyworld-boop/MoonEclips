@@ -59,7 +59,7 @@ public final class WipeMenu implements Listener {
         LocalTime time = manager.getSelectedTime();
         inv.setItem(10, item(Material.RED_DYE, "&c- 7 дней", "&7Перенести дату на неделю назад."));
         inv.setItem(11, item(Material.RED_DYE, "&c- 1 день", "&7Предыдущий день."));
-        inv.setItem(13, item(Material.CALENDAR, "&eДата вайпа", "&f" + date.format(DateTimeFormatter.ofPattern("dd.MM.uuuu")), "&7Выбирай дату кнопками по сторонам."));
+        inv.setItem(13, item(Material.WRITABLE_BOOK, "&eДата вайпа", "&f" + date.format(DateTimeFormatter.ofPattern("dd.MM.uuuu")), "&7Выбирай дату кнопками по сторонам."));
         inv.setItem(15, item(Material.LIME_DYE, "&a+ 1 день", "&7Следующий день."));
         inv.setItem(16, item(Material.LIME_DYE, "&a+ 7 дней", "&7Перенести дату на неделю вперёд."));
         inv.setItem(19, item(Material.REDSTONE, "&c- 1 час", "&7Уменьшить час."));
