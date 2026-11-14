@@ -11,6 +11,8 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -66,6 +68,10 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private BukkitTask visualTask;
     private BukkitTask endTask;
     private BukkitTask scheduledStartTask;
+    private BukkitTask countdownTask;
+    private ArmorStand timerHologram;
+    private String eventRarity = COMMON;
+    private long lootStartsAtMillis;
 
     @Override
     public void onEnable() {
@@ -141,12 +147,24 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         active = true;
         getConfig().set("runtime.active", true);
         saveConfig();
-        long duration = Math.max(30, getConfig().getLong("event.duration-seconds", 600));
+        long waitSeconds = Math.max(1, getConfig().getLong("event.loot-delay-seconds", 300));
+        long duration = Math.max(waitSeconds + 30, getConfig().getLong("event.duration-seconds", 600));
         long interval = Math.max(1, getConfig().getLong("event.drop-interval-seconds", 3));
+        eventRarity = chooseRarity();
+        lootStartsAtMillis = System.currentTimeMillis() + waitSeconds * 1000L;
         broadcastMeteorAnnouncement(target);
         target.getWorld().playSound(target, Sound.ENTITY_GENERIC_EXPLODE, 2.0f, 0.65f);
         target.getWorld().spawnParticle(Particle.EXPLOSION, target.clone().add(0, 3, 0), 1);
-        dropTask = Bukkit.getScheduler().runTaskTimer(this, this::dropLoot, 0L, interval * 20L);
+        spawnTimerHologram();
+        countdownTask = Bukkit.getScheduler().runTaskTimer(this, this::updateMeteorTimer, 0L, 20L);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!active) return;
+            cancelTask(countdownTask);
+            countdownTask = null;
+            removeTimerHologram();
+            Bukkit.broadcastMessage("§6§lМЕТЕОРИТ §8» §eКратер раскалился! Начинается выпадение ресурсов.");
+            dropTask = Bukkit.getScheduler().runTaskTimer(this, this::dropLoot, 0L, interval * 20L);
+        }, waitSeconds * 20L);
         visualTask = Bukkit.getScheduler().runTaskTimer(this, this::tickDrops, 10L, 10L);
         endTask = Bukkit.getScheduler().runTaskLater(this,
                 () -> stopEvent("§6§lМЕТЕОРИТ §8» §eСобытие завершено."), duration * 20L);
@@ -154,20 +172,53 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     }
 
     private void broadcastMeteorAnnouncement(Location target) {
-        int x = target.getBlockX();
-        int y = target.getBlockY();
-        int z = target.getBlockZ();
-
+        int x = target.getBlockX(), y = target.getBlockY(), z = target.getBlockZ();
+        String type = switch (eventRarity) {
+            case MOLTEN -> "§6§lПЛАВИЛЬНЫЙ МЕТЕОРИТ";
+            case BURNING -> "§c§lГОРЯЩИЙ МЕТЕОРИТ";
+            default -> "§f§lОБЫЧНЫЙ МЕТЕОРИТ";
+        };
+        long wait = Math.max(1, getConfig().getLong("event.loot-delay-seconds", 300));
         Bukkit.broadcastMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Bukkit.broadcastMessage("§6✦ §c§lМЕТЕОРИТНЫЙ ДОЖДЬ §6✦");
-        Bukkit.broadcastMessage("§7С неба упал метеорит! В его кратере уже появляется добыча.");
+        Bukkit.broadcastMessage("§6✦ §c§lПАДЕНИЕ МЕТЕОРИТА §6✦");
+        Bukkit.broadcastMessage("§7Упал: " + type);
+        Bukkit.broadcastMessage("§7До начала выпадения ресурсов: §e" + formatTime(wait));
         Bukkit.broadcastMessage("§fКоординаты: §eX: " + x + " §7| §eY: " + y + " §7| §eZ: " + z);
-        Bukkit.broadcastMessage("§7Предметы вылетают из кратера каждые §e3 секунды§7.");
-        Bukkit.broadcastMessage("§eУспейте добраться до метеорита и забрать редкие ресурсы!");
+        Bukkit.broadcastMessage("§7Добыча будет появляться каждые §e" +
+                Math.max(1, getConfig().getLong("event.drop-interval-seconds", 3)) + " сек.");
+        Bukkit.broadcastMessage("§eУспейте добраться до метеорита!");
         Bukkit.broadcastMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
         for (Player online : Bukkit.getOnlinePlayers()) {
             online.playSound(online.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+        }
+    }
+
+    private String formatTime(long seconds) {
+        return String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
+    }
+
+    private void spawnTimerHologram() {
+        if (meteorCenter == null || meteorCenter.getWorld() == null) return;
+        timerHologram = meteorCenter.getWorld().spawn(meteorCenter.clone().add(0, 24, 0), ArmorStand.class, stand -> {
+            stand.setInvisible(true);
+            stand.setMarker(true);
+            stand.setGravity(false);
+            stand.setCustomNameVisible(true);
+            stand.setCustomName("§eДо выпадения ресурсов: §f05:00");
+            stand.setPersistent(false);
+        });
+    }
+
+    private void updateMeteorTimer() {
+        if (!active || timerHologram == null || !timerHologram.isValid()) return;
+        long remaining = Math.max(0, (lootStartsAtMillis - System.currentTimeMillis() + 999) / 1000);
+        timerHologram.setCustomName("§eДо выпадения ресурсов: §f" + formatTime(remaining));
+    }
+
+    private void removeTimerHologram() {
+        if (timerHologram != null) {
+            timerHologram.remove();
+            timerHologram = null;
         }
     }
 
@@ -198,18 +249,16 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private void buildMeteorite() {
         meteorBlocks.clear();
         World world = meteorCenter.getWorld();
-        // Диаметр 13 блоков: максимальный радиус 6.
-        int[] radii = {6, 6, 5, 4, 3, 2, 1};
         Material[] palette = {Material.BLACKSTONE, Material.BASALT, Material.MAGMA_BLOCK,
                 Material.ANCIENT_DEBRIS, Material.POLISHED_BASALT};
-
-        // Формируем корпус метеорита с центральным отверстием 3x3.
-        for (int layer = 0; layer < radii.length; layer++) {
-            int radius = radii[layer];
+        // Корпус примерно 40 блоков в ширину и 20 блоков в высоту.
+        for (int layer = 0; layer < 20; layer++) {
+            double vertical = (layer - 9.5) / 10.0;
+            int radius = (int) Math.floor(20.0 * Math.sqrt(Math.max(0, 1.0 - vertical * vertical)));
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (dx * dx + dz * dz > radius * radius) continue;
-                    if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) continue;
+                    if (layer >= 14 && Math.abs(dx) <= 2 && Math.abs(dz) <= 2) continue;
                     Block block = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + layer,
                             meteorCenter.getBlockZ() + dz);
                     if (!block.getType().isAir()) continue;
@@ -218,15 +267,14 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 }
             }
         }
-
-        // Сплошное дно ямы из блоков метеорита на уровне baseY + 1.
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                Block floor = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + 1,
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                Block floor = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + 14,
                         meteorCenter.getBlockZ() + dz);
-                if (!floor.getType().isAir()) continue;
-                floor.setType(Material.ANCIENT_DEBRIS, false);
-                meteorBlocks.add(floor.getLocation());
+                if (floor.getType().isAir()) {
+                    floor.setType(Material.ANCIENT_DEBRIS, false);
+                    meteorBlocks.add(floor.getLocation());
+                }
             }
         }
         persistMeteorBlocks();
@@ -234,21 +282,20 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
 
     private void dropLoot() {
         if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
-        String rarity = chooseRarity();
+        String rarity = eventRarity;
         List<ItemStack> loot = getLoot(rarity);
         if (loot.isEmpty()) return;
         ItemStack stack = loot.get(random.nextInt(loot.size())).clone();
         int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
         int max = Math.max(min, getConfig().getInt("random-loot.max-amount", 3));
         stack.setAmount(min == max ? min : min + random.nextInt(max - min + 1));
-        // Предмет появляется внутри ямы и выстреливает вверх, затем разлетается в стороны.
-        Location spawn = meteorCenter.clone().add((random.nextDouble() - 0.5) * 0.45, 2.0,
-                (random.nextDouble() - 0.5) * 0.45);
+        // Сразу выбрасываем за край корпуса, чтобы предметы не застревали в чаше.
+        double angle = random.nextDouble() * Math.PI * 2.0;
+        Vector direction = new Vector(Math.cos(angle), 0, Math.sin(angle)).normalize();
+        Location spawn = meteorCenter.clone().add(direction.getX() * 21.5, 10.0, direction.getZ() * 21.5);
         Item item = meteorCenter.getWorld().dropItem(spawn, stack);
         item.setPickupDelay(0);
-        item.setVelocity(new Vector((random.nextDouble() - 0.5) * 0.55,
-                0.48 + random.nextDouble() * 0.28,
-                (random.nextDouble() - 0.5) * 0.55));
+        item.setVelocity(direction.multiply(0.75).setY(0.62 + random.nextDouble() * 0.2));
         item.getPersistentDataContainer().set(dropKey, PersistentDataType.BYTE, (byte) 1);
         String itemName = stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()
                 ? stack.getItemMeta().getDisplayName() : prettify(stack.getType());
@@ -306,6 +353,9 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         cancelTask(dropTask); dropTask = null;
         cancelTask(visualTask); visualTask = null;
         cancelTask(endTask); endTask = null;
+        cancelTask(countdownTask); countdownTask = null;
+        removeTimerHologram();
+        eventRarity = COMMON;
         for (UUID id : new HashSet<>(liveDrops.keySet())) {
             Entity entity = Bukkit.getEntity(id);
             if (entity != null) entity.remove();
@@ -322,7 +372,9 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
 
     private void cancelTasks() {
         cancelTask(dropTask); cancelTask(visualTask); cancelTask(endTask); cancelTask(scheduledStartTask);
-        dropTask = visualTask = endTask = scheduledStartTask = null;
+        cancelTask(countdownTask);
+        dropTask = visualTask = endTask = scheduledStartTask = countdownTask = null;
+        removeTimerHologram();
     }
 
     private void cancelTask(BukkitTask task) {
@@ -385,8 +437,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private boolean insideProtectedZone(Location location) {
         if (!active || meteorCenter == null || location.getWorld() == null
                 || !location.getWorld().equals(meteorCenter.getWorld())) return false;
-        int radius = Math.max(2, getConfig().getInt("event.protection-radius", 8));
-        int height = Math.max(3, getConfig().getInt("event.protection-height", 8));
+        int radius = Math.max(20, getConfig().getInt("event.protection-radius", 20));
+        int height = Math.max(20, getConfig().getInt("event.protection-height", 20));
         return Math.abs(location.getBlockX() - meteorCenter.getBlockX()) <= radius
                 && Math.abs(location.getBlockZ() - meteorCenter.getBlockZ()) <= radius
                 && location.getBlockY() >= baseY - 1 && location.getBlockY() <= baseY + height;
@@ -558,8 +610,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         for (int i = 0; i < Math.min(45, items.size()); i++) inv.setItem(i, items.get(i).clone());
         inv.setItem(45, button(Material.LIME_DYE, "Добавить предмет из руки",
                 "§7Возьмите предмет в основную руку"));
-        inv.setItem(49, button(Material.SUNFLOWER, "Сгенерировать 20 случайных предметов",
-                "§7Используется пул случайной генерации"));
+        inv.setItem(49, button(Material.SUNFLOWER, "Сгенерировать 20 ценных предметов",
+                "§7Отдельный пул этой редкости; экипировка с зачарованиями"));
         inv.setItem(53, button(Material.ARROW, "Назад"));
     }
 
@@ -708,13 +760,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             return;
         }
         if (slot == 49) {
-            List<Material> pool = getRandomPoolMaterials();
-            if (pool.isEmpty()) {
-                player.sendMessage("§cВ пуле нет разрешённых предметов.");
-                return;
-            }
             items.clear();
-            for (int i = 0; i < 20; i++) items.add(new ItemStack(pool.get(random.nextInt(pool.size())), 1));
+            for (int i = 0; i < 20; i++) items.add(generateRandomLootItem(rarity));
             saveLoot(rarity, items);
             openLootMenu(player, rarity);
             return;
@@ -776,33 +823,105 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    private List<Material> getRandomPoolMaterials() {
-        List<Material> result = new ArrayList<>();
-        Collection<?> configured = getConfig().getList("random-pool", List.of());
-        if (!configured.isEmpty()) {
-            for (Object value : configured) {
-                if (value instanceof ItemStack stack && isAllowedRandomItem(stack.getType())) {
-                    result.add(stack.getType());
-                }
-            }
-        } else {
-            for (Material material : Material.values()) {
-                if (isAllowedRandomItem(material)) result.add(material);
-            }
-        }
-        return result;
+    private ItemStack generateRandomLootItem(String rarity) {
+        List<ItemStack> pool = new ArrayList<>();
+        int tier = BURNING.equals(rarity) ? 4 : MOLTEN.equals(rarity) ? 2 : 1;
+        addValuableBasics(pool, tier);
+        addDiamondGear(pool, tier);
+        if (tier >= 2) addSpawnEggs(pool, tier);
+        if (tier >= 4) addNetheriteGear(pool);
+        return pool.get(random.nextInt(pool.size())).clone();
     }
 
-    private boolean isAllowedRandomItem(Material material) {
-        if (material == null || !material.isItem() || material.isAir()) return false;
-        String name = material.name();
-        return material != Material.BEDROCK && material != Material.BARRIER && material != Material.COMMAND_BLOCK
-                && material != Material.CHAIN_COMMAND_BLOCK && material != Material.REPEATING_COMMAND_BLOCK
-                && material != Material.STRUCTURE_BLOCK && material != Material.STRUCTURE_VOID
-                && material != Material.JIGSAW && material != Material.DEBUG_STICK
-                && material != Material.KNOWLEDGE_BOOK && material != Material.SPAWNER
-                && material != Material.END_PORTAL_FRAME && material != Material.LIGHT
-                && !name.contains("COMMAND_BLOCK") && !name.contains("SPAWN_EGG");
+    private void addValuableBasics(List<ItemStack> pool, int tier) {
+        add(pool, Material.GOLDEN_APPLE, 3);
+        add(pool, Material.GOLDEN_CARROT, 4);
+        add(pool, Material.DIAMOND, tier == 1 ? 5 : 9);
+        add(pool, Material.EMERALD, tier == 1 ? 3 : 8);
+        add(pool, Material.GOLD_INGOT, 4);
+        if (tier >= 2) {
+            add(pool, Material.DIAMOND_BLOCK, 4);
+            add(pool, Material.EMERALD_BLOCK, 3);
+            add(pool, Material.GOLD_BLOCK, 3);
+            add(pool, Material.IRON_BLOCK, 2);
+            add(pool, Material.NETHERITE_SCRAP, 3);
+            add(pool, Material.ANCIENT_DEBRIS, 2);
+            add(pool, Material.TOTEM_OF_UNDYING, 1);
+        }
+        if (tier >= 4) {
+            add(pool, Material.ENCHANTED_GOLDEN_APPLE, 2);
+            add(pool, Material.NETHERITE_INGOT, 4);
+            add(pool, Material.NETHERITE_BLOCK, 2);
+            add(pool, Material.BEACON, 1);
+            add(pool, Material.SHULKER_BOX, 1);
+            add(pool, Material.ELYTRA, 1);
+        }
+    }
+
+    private void addDiamondGear(List<ItemStack> pool, int tier) {
+        int sharp = tier == 1 ? 3 : tier == 2 ? 5 : 7;
+        int tool = tier == 1 ? 3 : tier == 2 ? 5 : 7;
+        addEnchanted(pool, Material.DIAMOND_SWORD, Enchantment.SHARPNESS, sharp,
+                Enchantment.UNBREAKING, tier + 1, Enchantment.LOOTING, tier);
+        addEnchanted(pool, Material.DIAMOND_PICKAXE, Enchantment.EFFICIENCY, tool,
+                Enchantment.UNBREAKING, tier + 1, Enchantment.FORTUNE, tier);
+        addEnchanted(pool, Material.DIAMOND_AXE, Enchantment.EFFICIENCY, tool,
+                Enchantment.UNBREAKING, tier + 1, Enchantment.SHARPNESS, Math.max(2, tier + 1));
+        addEnchanted(pool, Material.DIAMOND_SHOVEL, Enchantment.EFFICIENCY, tool,
+                Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.DIAMOND_HELMET, Enchantment.PROTECTION, tier + 1,
+                Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.DIAMOND_CHESTPLATE, Enchantment.PROTECTION, tier + 1,
+                Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.DIAMOND_LEGGINGS, Enchantment.PROTECTION, tier + 1,
+                Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.DIAMOND_BOOTS, Enchantment.PROTECTION, tier + 1,
+                Enchantment.FEATHER_FALLING, tier + 1, Enchantment.UNBREAKING, tier + 1);
+    }
+
+    private void addSpawnEggs(List<ItemStack> pool, int tier) {
+        String[] eggs = tier >= 4
+                ? new String[]{"WARDEN_SPAWN_EGG", "EVOKER_SPAWN_EGG", "BLAZE_SPAWN_EGG",
+                    "CREEPER_SPAWN_EGG", "ENDERMAN_SPAWN_EGG", "WITHER_SKELETON_SPAWN_EGG"}
+                : new String[]{"BLAZE_SPAWN_EGG", "CREEPER_SPAWN_EGG", "ENDERMAN_SPAWN_EGG",
+                    "PIGLIN_BRUTE_SPAWN_EGG", "VINDICATOR_SPAWN_EGG"};
+        for (String name : eggs) {
+            Material material = Material.matchMaterial(name);
+            if (material != null) pool.add(new ItemStack(material));
+        }
+    }
+
+    private void addNetheriteGear(List<ItemStack> pool) {
+        addEnchanted(pool, Material.NETHERITE_SWORD, Enchantment.SHARPNESS, 7,
+                Enchantment.UNBREAKING, 4, Enchantment.LOOTING, 4, Enchantment.FIRE_ASPECT, 2);
+        addEnchanted(pool, Material.NETHERITE_PICKAXE, Enchantment.EFFICIENCY, 7,
+                Enchantment.UNBREAKING, 4, Enchantment.FORTUNE, 4);
+        addEnchanted(pool, Material.NETHERITE_AXE, Enchantment.EFFICIENCY, 7,
+                Enchantment.UNBREAKING, 4, Enchantment.SHARPNESS, 6);
+        addEnchanted(pool, Material.NETHERITE_SHOVEL, Enchantment.EFFICIENCY, 7,
+                Enchantment.UNBREAKING, 4);
+        addEnchanted(pool, Material.NETHERITE_HELMET, Enchantment.PROTECTION, 5,
+                Enchantment.UNBREAKING, 4, Enchantment.RESPIRATION, 3);
+        addEnchanted(pool, Material.NETHERITE_CHESTPLATE, Enchantment.PROTECTION, 5,
+                Enchantment.UNBREAKING, 4);
+        addEnchanted(pool, Material.NETHERITE_LEGGINGS, Enchantment.PROTECTION, 5,
+                Enchantment.UNBREAKING, 4);
+        addEnchanted(pool, Material.NETHERITE_BOOTS, Enchantment.PROTECTION, 5,
+                Enchantment.FEATHER_FALLING, 5, Enchantment.UNBREAKING, 4);
+    }
+
+    private void add(List<ItemStack> pool, Material material, int copies) {
+        for (int i = 0; i < copies; i++) pool.add(new ItemStack(material));
+    }
+
+    private void addEnchanted(List<ItemStack> pool, Material material, Object... enchantments) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        for (int i = 0; i + 1 < enchantments.length; i += 2) {
+            meta.addEnchant((Enchantment) enchantments[i], (Integer) enchantments[i + 1], true);
+        }
+        item.setItemMeta(meta);
+        pool.add(item);
     }
 
     private String rarityName(String rarity) {
