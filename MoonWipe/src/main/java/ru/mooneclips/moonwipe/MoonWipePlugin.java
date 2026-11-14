@@ -410,13 +410,29 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
             send(sender, "&cВайп запрещён: резервное копирование отключено. Включи backup.enabled.");
             return;
         }
+        if (getConfig().getBoolean("wipe.reset-money", true)) {
+            Path essentialsUserdata = serverRoot().resolve("plugins/Essentials/userdata");
+            if (!Files.isDirectory(essentialsUserdata)) {
+                wipeInProgress.set(false);
+                send(sender, "&cНе найдена папка plugins/Essentials/userdata. Сброс Money отменён.");
+                return;
+            }
+            if (getServer().getServicesManager().getRegistration(Economy.class) == null) {
+                wipeInProgress.set(false);
+                send(sender, "&cНе найден Vault Economy provider. Проверь Vault и EssentialsX Economy.");
+                return;
+            }
+        }
         if (getConfig().getBoolean("wipe.reset-auction-database", true)) {
             try {
-                resolveSafeAuctionDatabase(serverRoot(),
+                Path database = resolveSafeAuctionDatabase(serverRoot(),
                         getConfig().getString("wipe.auction-database", "plugins/EconomicMoonEclips/auction.db"));
+                if (!Files.isRegularFile(database)) {
+                    throw new IOException("database file does not exist: " + database);
+                }
             } catch (Exception exception) {
                 wipeInProgress.set(false);
-                send(sender, "&cНеверный путь базы аукциона: " + exception.getMessage());
+                send(sender, "&cБаза аукциона не готова к сбросу: " + exception.getMessage());
                 return;
             }
         }
