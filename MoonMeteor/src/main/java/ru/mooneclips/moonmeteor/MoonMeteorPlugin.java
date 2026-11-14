@@ -14,6 +14,14 @@ import org.bukkit.entity.Item;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Zombie;
+import org.bukkit.entity.EntityType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.event.EventHandler;
@@ -73,6 +81,10 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private BukkitTask endTask;
     private BukkitTask scheduledStartTask;
     private BukkitTask countdownTask;
+    private BukkitTask hazardTask;
+    private BukkitTask guardTask;
+    private int hazardCycle;
+    private final Set<UUID> meteorGuards = new HashSet<>();
     private ArmorStand timerHologram;
     private String eventRarity = COMMON;
     private long lootStartsAtMillis;
@@ -176,6 +188,9 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             dropTask = Bukkit.getScheduler().runTaskTimer(this, this::dropLoot, 0L, interval * 20L);
         }, waitSeconds * 20L);
         visualTask = Bukkit.getScheduler().runTaskTimer(this, this::tickDrops, 10L, 10L);
+        hazardCycle = 0;
+        hazardTask = Bukkit.getScheduler().runTaskTimer(this, this::applyMeteorHazard, 20L * 40L, 20L * 40L);
+        guardTask = Bukkit.getScheduler().runTaskTimer(this, this::spawnMeteorGuards, 20L * 60L, 20L * 60L);
         endTask = Bukkit.getScheduler().runTaskLater(this,
                 () -> stopEvent("§6§lМЕТЕОРИТ §8» §eСобытие завершено."), duration * 20L);
         if (admin != null) admin.sendMessage("§aСобытие метеорита запущено.");
@@ -264,10 +279,12 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         // Корпус примерно 40 блоков в ширину и 20 блоков в высоту.
         for (int layer = 0; layer < 20; layer++) {
             double vertical = (layer - 9.5) / 10.0;
-            int radius = (int) Math.floor(20.0 * Math.sqrt(Math.max(0, 1.0 - vertical * vertical)));
+            int baseRadius = (int) Math.floor(20.0 * Math.sqrt(Math.max(0, 1.0 - vertical * vertical)));
+            int radius = Math.max(0, baseRadius - random.nextInt(3));
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
-                    if (dx * dx + dz * dz > radius * radius) continue;
+                    double jaggedEdge = 1.0 + (random.nextDouble() - 0.5) * 0.22;
+                    if (dx * dx + dz * dz > radius * radius * jaggedEdge) continue;
                     if (layer >= 14 && Math.abs(dx) <= 2 && Math.abs(dz) <= 2) continue;
                     Block block = world.getBlockAt(meteorCenter.getBlockX() + dx, baseY + layer,
                             meteorCenter.getBlockZ() + dz);
@@ -287,7 +304,36 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 }
             }
         }
+        buildImpactDebris();
         persistMeteorBlocks();
+    }
+
+    private void buildImpactDebris() {
+        World world = meteorCenter.getWorld();
+        Material[] debris = {Material.BLACKSTONE, Material.BASALT, Material.MAGMA_BLOCK,
+                Material.COBBLED_DEEPSLATE, Material.TUFF};
+        int radius = 13;
+        for (int i = 0; i < 95; i++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            double distance = 5.0 + random.nextDouble() * radius;
+            int x = meteorCenter.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+            int z = meteorCenter.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
+            Block ground = world.getHighestBlockAt(x, z);
+            Block target = ground.getRelative(0, 1 + random.nextInt(2), 0);
+            if (!target.getType().isAir()) continue;
+            target.setType(debris[random.nextInt(debris.length)], false);
+            meteorBlocks.add(target.getLocation());
+        }
+        for (int i = 0; i < 22; i++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            double distance = 4.0 + random.nextDouble() * 7.0;
+            int x = meteorCenter.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+            int z = meteorCenter.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
+            Block ground = world.getHighestBlockAt(x, z);
+            if (ground.getType().isAir() || !ground.getRelative(0, 1, 0).getType().isAir()) continue;
+            ground.getRelative(0, 1, 0).setType(Material.MAGMA_BLOCK, false);
+            meteorBlocks.add(ground.getRelative(0, 1, 0).getLocation());
+        }
     }
 
     private void dropLoot() {
@@ -363,6 +409,61 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
     }
 
+    private void applyMeteorHazard() {
+        if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
+        PotionEffectType effect = (hazardCycle++ % 2 == 0)
+                ? PotionEffectType.WEAKNESS : PotionEffectType.BLINDNESS;
+        for (Player player : meteorCenter.getWorld().getPlayers()) {
+            if (!insideProtectedZone(player.getLocation())) continue;
+            player.addPotionEffect(new PotionEffect(effect, 20 * 40, 0, true, true, true));
+            player.sendMessage(effect == PotionEffectType.WEAKNESS
+                    ? "§cМетеорит подавляет вашу силу..."
+                    : "§8Пыль метеорита застилает вам глаза...");
+        }
+    }
+
+    private void spawnMeteorGuards() {
+        if (!active || meteorCenter == null || meteorCenter.getWorld() == null) return;
+        int count = BURNING.equals(eventRarity) ? 6 : MOLTEN.equals(eventRarity) ? 4 : 2;
+        Material armor = BURNING.equals(eventRarity) ? Material.NETHERITE_CHESTPLATE
+                : MOLTEN.equals(eventRarity) ? Material.DIAMOND_CHESTPLATE : Material.IRON_CHESTPLATE;
+        Material helmet = BURNING.equals(eventRarity) ? Material.NETHERITE_HELMET
+                : MOLTEN.equals(eventRarity) ? Material.DIAMOND_HELMET : Material.IRON_HELMET;
+        Material leggings = BURNING.equals(eventRarity) ? Material.NETHERITE_LEGGINGS
+                : MOLTEN.equals(eventRarity) ? Material.DIAMOND_LEGGINGS : Material.IRON_LEGGINGS;
+        Material boots = BURNING.equals(eventRarity) ? Material.NETHERITE_BOOTS
+                : MOLTEN.equals(eventRarity) ? Material.DIAMOND_BOOTS : Material.IRON_BOOTS;
+        Material weapon = BURNING.equals(eventRarity) ? Material.NETHERITE_SWORD
+                : MOLTEN.equals(eventRarity) ? Material.DIAMOND_SWORD : Material.IRON_SWORD;
+        for (int i = 0; i < count; i++) {
+            double angle = (Math.PI * 2.0 * i / count) + random.nextDouble() * 0.35;
+            double distance = 24.0 + random.nextDouble() * 5.0;
+            Location spawn = meteorCenter.clone().add(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+            spawn.setY(meteorCenter.getWorld().getHighestBlockYAt(spawn) + 1);
+            Zombie zombie = (Zombie) meteorCenter.getWorld().spawnEntity(spawn, EntityType.ZOMBIE);
+            zombie.setPersistent(false);
+            zombie.setRemoveWhenFarAway(true);
+            zombie.setCanPickupItems(false);
+            zombie.setCustomName(rarityName(eventRarity) + " §cСтраж метеорита");
+            zombie.setCustomNameVisible(true);
+            var equipment = zombie.getEquipment();
+            if (equipment != null) {
+                equipment.setHelmet(new ItemStack(helmet));
+                equipment.setChestplate(new ItemStack(armor));
+                equipment.setLeggings(new ItemStack(leggings));
+                equipment.setBoots(new ItemStack(boots));
+                equipment.setItemInMainHand(new ItemStack(weapon));
+                equipment.setHelmetDropChance(0.0f);
+                equipment.setChestplateDropChance(0.0f);
+                equipment.setLeggingsDropChance(0.0f);
+                equipment.setBootsDropChance(0.0f);
+                equipment.setItemInMainHandDropChance(0.0f);
+            }
+            meteorGuards.add(zombie.getUniqueId());
+        }
+        Bukkit.broadcastMessage("§cМетеорит выпустил §e" + count + " §cстражей!");
+    }
+
     private void tickDrops() {
         if (!active) return;
         long now = System.currentTimeMillis();
@@ -412,6 +513,13 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         cancelTask(visualTask); visualTask = null;
         cancelTask(endTask); endTask = null;
         cancelTask(countdownTask); countdownTask = null;
+        cancelTask(hazardTask); hazardTask = null;
+        cancelTask(guardTask); guardTask = null;
+        for (UUID id : new HashSet<>(meteorGuards)) {
+            Entity guard = Bukkit.getEntity(id);
+            if (guard != null) guard.remove();
+        }
+        meteorGuards.clear();
         removeTimerHologram();
         eventRarity = COMMON;
         for (UUID id : new HashSet<>(liveDrops.keySet())) {
@@ -431,7 +539,9 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private void cancelTasks() {
         cancelTask(dropTask); cancelTask(visualTask); cancelTask(endTask); cancelTask(scheduledStartTask);
         cancelTask(countdownTask);
-        dropTask = visualTask = endTask = scheduledStartTask = countdownTask = null;
+        cancelTask(hazardTask);
+        cancelTask(guardTask);
+        dropTask = visualTask = endTask = scheduledStartTask = countdownTask = hazardTask = guardTask = null;
         removeTimerHologram();
     }
 
@@ -906,6 +1016,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         int tier = BURNING.equals(rarity) ? 4 : MOLTEN.equals(rarity) ? 2 : 1;
         addValuableBasics(pool, tier);
         addDiamondGear(pool, tier);
+        addEnchantedBooks(pool, tier);
+        addPotionLoot(pool, tier);
         if (tier >= 2) addSpawnEggs(pool, tier);
         addUtilityAndRareLoot(pool, tier);
         if (tier >= 4) addNetheriteGear(pool);
@@ -918,6 +1030,25 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         add(pool, Material.DIAMOND, tier == 1 ? 5 : 9);
         add(pool, Material.EMERALD, tier == 1 ? 3 : 8);
         add(pool, Material.GOLD_INGOT, 4);
+        add(pool, Material.IRON_NUGGET, 8);
+        add(pool, Material.GOLD_NUGGET, 6);
+        add(pool, Material.RAW_IRON, 3);
+        add(pool, Material.RAW_GOLD, 3);
+        add(pool, Material.RAW_COPPER, 4);
+        add(pool, Material.COPPER_INGOT, 5);
+        add(pool, Material.COPPER_ORE, 2);
+        add(pool, Material.DEEPSLATE_COPPER_ORE, 2);
+        add(pool, Material.IRON_ORE, 2);
+        add(pool, Material.DEEPSLATE_IRON_ORE, 2);
+        add(pool, Material.GOLD_ORE, 2);
+        add(pool, Material.DEEPSLATE_GOLD_ORE, 2);
+        add(pool, Material.COAL, 5);
+        add(pool, Material.LAPIS_LAZULI, 4);
+        add(pool, Material.REDSTONE, 5);
+        add(pool, Material.RAW_IRON_BLOCK, 1);
+        add(pool, Material.RAW_GOLD_BLOCK, 1);
+        add(pool, Material.RAW_COPPER_BLOCK, 1);
+        add(pool, Material.COPPER_BLOCK, 1);
         if (tier >= 2) {
             add(pool, Material.DIAMOND_BLOCK, 4);
             add(pool, Material.EMERALD_BLOCK, 3);
@@ -926,6 +1057,11 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             add(pool, Material.NETHERITE_SCRAP, 3);
             add(pool, Material.ANCIENT_DEBRIS, 2);
             add(pool, Material.TOTEM_OF_UNDYING, 1);
+            add(pool, Material.SPAWNER, 1);
+            add(pool, Material.IRON_ORE, 3);
+            add(pool, Material.GOLD_ORE, 3);
+            add(pool, Material.DIAMOND_ORE, 2);
+            add(pool, Material.EMERALD_ORE, 2);
         }
         if (tier >= 4) {
             add(pool, Material.ENCHANTED_GOLDEN_APPLE, 2);
@@ -947,6 +1083,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         addEnchanted(pool, Material.DIAMOND_AXE, Enchantment.EFFICIENCY, tool,
                 Enchantment.UNBREAKING, tier + 1, Enchantment.SHARPNESS, Math.max(2, tier + 1));
         addEnchanted(pool, Material.DIAMOND_SHOVEL, Enchantment.EFFICIENCY, tool,
+                Enchantment.UNBREAKING, tier + 1);
+        addEnchanted(pool, Material.DIAMOND_HOE, Enchantment.EFFICIENCY, tool,
                 Enchantment.UNBREAKING, tier + 1);
         addEnchanted(pool, Material.DIAMOND_HELMET, Enchantment.PROTECTION, tier + 1,
                 Enchantment.UNBREAKING, tier + 1);
@@ -1021,6 +1159,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 Enchantment.UNBREAKING, 4, Enchantment.SHARPNESS, 6);
         addEnchanted(pool, Material.NETHERITE_SHOVEL, Enchantment.EFFICIENCY, 7,
                 Enchantment.UNBREAKING, 4);
+        addEnchanted(pool, Material.NETHERITE_HOE, Enchantment.EFFICIENCY, 7,
+                Enchantment.UNBREAKING, 4);
         addEnchanted(pool, Material.NETHERITE_HELMET, Enchantment.PROTECTION, 5,
                 Enchantment.UNBREAKING, 4, Enchantment.RESPIRATION, 3);
         addEnchanted(pool, Material.NETHERITE_CHESTPLATE, Enchantment.PROTECTION, 5,
@@ -1029,6 +1169,44 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
                 Enchantment.UNBREAKING, 4);
         addEnchanted(pool, Material.NETHERITE_BOOTS, Enchantment.PROTECTION, 5,
                 Enchantment.FEATHER_FALLING, 5, Enchantment.UNBREAKING, 4);
+    }
+
+    private void addEnchantedBooks(List<ItemStack> pool, int tier) {
+        Enchantment[] choices = {Enchantment.MENDING, Enchantment.UNBREAKING, Enchantment.SHARPNESS,
+                Enchantment.FIRE_ASPECT, Enchantment.LOOTING, Enchantment.VANISHING_CURSE};
+        int books = tier >= 4 ? 7 : tier >= 2 ? 5 : 3;
+        for (int i = 0; i < books; i++) {
+            Enchantment enchantment = choices[random.nextInt(choices.length)];
+            int level = enchantment == Enchantment.MENDING || enchantment == Enchantment.VANISHING_CURSE
+                    ? 1 : Math.min(enchantment.getMaxLevel(), 1 + random.nextInt(Math.max(1, tier + 1)));
+            ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
+            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
+            meta.addStoredEnchant(enchantment, level, true);
+            book.setItemMeta(meta);
+            pool.add(book);
+        }
+    }
+
+    private void addPotionLoot(List<ItemStack> pool, int tier) {
+        addPotion(pool, PotionType.INVISIBILITY, null);
+        addPotion(pool, PotionType.LEAPING, null);
+        addPotion(pool, PotionType.STRENGTH, null);
+        addPotion(pool, PotionType.SWIFTNESS, null);
+        addPotion(pool, null, new PotionEffect(PotionEffectType.MINING_FATIGUE, 20 * 90, 0));
+        addPotion(pool, null, new PotionEffect(PotionEffectType.WEAKNESS, 20 * 90, 0));
+        if (tier >= 2) {
+            addPotion(pool, PotionType.LONG_INVISIBILITY, null);
+            addPotion(pool, PotionType.LONG_SWIFTNESS, null);
+        }
+    }
+
+    private void addPotion(List<ItemStack> pool, PotionType base, PotionEffect custom) {
+        ItemStack potion = new ItemStack(Material.POTION);
+        PotionMeta meta = (PotionMeta) potion.getItemMeta();
+        if (base != null) meta.setBasePotionType(base);
+        if (custom != null) meta.addCustomEffect(custom, true);
+        potion.setItemMeta(meta);
+        pool.add(potion);
     }
 
     private void add(List<ItemStack> pool, Material material, int copies) {
