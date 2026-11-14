@@ -17,9 +17,12 @@ import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
@@ -102,6 +105,22 @@ public final class MoonScoreboardsPlugin extends JavaPlugin implements Listener,
             }
         }
         if (luckPerms == null) getLogger().warning("LuckPerms не найден: привилегии не будут отображаться.");
+    }
+
+    @EventHandler
+    public void onProfileClick(InventoryClickEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof ProfileHolder) {
+            // Block clicks in both inventories while the profile is open.
+            // This also prevents shift-click, number-key swaps and double-click collection.
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onProfileDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof ProfileHolder) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
@@ -242,7 +261,7 @@ public final class MoonScoreboardsPlugin extends JavaPlugin implements Listener,
 
     private void openProfile(Player viewer, OfflinePlayer target) {
         PlayerStats stats = collectStats(target);
-        Inventory inventory = Bukkit.createInventory(null, 45,
+        Inventory inventory = Bukkit.createInventory(new ProfileHolder(), 45,
                 color(getConfig().getString("profile.title", "&5Профиль игрока")) + " &8» &f" + safeName(target));
         ItemStack pane = item(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
         for (int i = 0; i < inventory.getSize(); i++) inventory.setItem(i, pane);
@@ -375,6 +394,13 @@ public final class MoonScoreboardsPlugin extends JavaPlugin implements Listener,
             return names;
         }
         return List.of();
+    }
+
+    private static final class ProfileHolder implements InventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
     }
 
     private record PlayerStats(int kills, int deaths, long playTicks, double balance, String rank,
