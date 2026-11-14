@@ -1,0 +1,17 @@
+name: MoonRTP
+version: 1.21.0b
+main: ru.mooneclips.moonrtp.MoonRTP
+api-version: '1.21'
+author: MoonEclips
+description: Safe random teleportation for MoonEclips.
+commands:
+  rtp:
+    description: Телепортация в случайное безопасное место
+    usage: /rtp
+permissions:
+  moonrtp.use:
+    description: Разрешает использовать RTP
+    default: true
+  moonrtp.admin:
+    description: Администрирование MoonRTP
+    default: op
