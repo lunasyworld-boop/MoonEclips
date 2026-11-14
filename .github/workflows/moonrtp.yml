@@ -1,0 +1,38 @@
+name: MoonRTP Build
+
+on:
+  push:
+    branches: [ "feature/moonrtp-development" ]
+    paths:
+      - "MoonRTP/**"
+      - ".github/workflows/moonrtp.yml"
+  pull_request:
+    paths:
+      - "MoonRTP/**"
+      - ".github/workflows/moonrtp.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: MoonRTP
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: MoonRTP/pom.xml
+      - name: Compile and package
+        run: mvn --batch-mode --no-transfer-progress clean package
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonRTP-1.21.0b
+          path: MoonRTP/target/MoonRTP-1.21.0b.jar
+          if-no-files-found: error
