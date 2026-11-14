@@ -23,8 +23,10 @@
 - /mwipe cancel отменяет активный обратный отсчёт.
 
 ### 3.2 Автоматический режим
-- Настройка дня недели и времени командой /mwipe schedule <DAY> <HH:mm>.
+- Выбор даты и времени одноразового вайпа в GUI /mwipe menu без ограничения на недельный цикл.
+- Выбор дня недели и времени для повторяющегося расписания командой /mwipe schedule <DAY> <HH:mm>.
 - Отключение: /mwipe schedule off.
+- В GUI доступны переключатели сброса миров, балансов Vault и аукциона EconomicMoonEclips; неизвестные плагины не очищаются без проверенного адаптера.
 - Часовой пояс задаётся в config.yml: schedule.timezone (system или IANA, например Europe/Berlin).
 - Расписание по умолчанию выключено, чтобы плагин не запускал вайп без явного включения.
 - Начало обратного отсчёта рассчитывается так, чтобы завершить вайп к заданному времени.
@@ -103,6 +105,8 @@
 - backup.directory
 - worlds.additional
 - schedule.enabled
+- schedule.mode (weekly или once)
+- schedule.date (для одноразового запуска)
 - schedule.day
 - schedule.time
 - schedule.timezone
