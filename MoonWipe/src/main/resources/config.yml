@@ -24,6 +24,7 @@ auction:
 
 schedule:
   enabled: false
+  mode: weekly
   day: SATURDAY
   time: "14:00"
   timezone: system
