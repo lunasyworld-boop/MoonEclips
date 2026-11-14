@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
@@ -142,15 +143,32 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         saveConfig();
         long duration = Math.max(30, getConfig().getLong("event.duration-seconds", 600));
         long interval = Math.max(1, getConfig().getLong("event.drop-interval-seconds", 3));
-        Bukkit.broadcastMessage("§6§lМЕТЕОРИТ §8» §eМетеорит упал! Координаты: §f" +
-                target.getBlockX() + " " + target.getBlockY() + " " + target.getBlockZ());
-        target.getWorld().playSound(target, "entity.generic.explode", 2.0f, 0.65f);
+        broadcastMeteorAnnouncement(target);
+        target.getWorld().playSound(target, Sound.ENTITY_GENERIC_EXPLODE, 2.0f, 0.65f);
         target.getWorld().spawnParticle(Particle.EXPLOSION, target.clone().add(0, 3, 0), 1);
         dropTask = Bukkit.getScheduler().runTaskTimer(this, this::dropLoot, 0L, interval * 20L);
         visualTask = Bukkit.getScheduler().runTaskTimer(this, this::tickDrops, 10L, 10L);
         endTask = Bukkit.getScheduler().runTaskLater(this,
                 () -> stopEvent("§6§lМЕТЕОРИТ §8» §eСобытие завершено."), duration * 20L);
         if (admin != null) admin.sendMessage("§aСобытие метеорита запущено.");
+    }
+
+    private void broadcastMeteorAnnouncement(Location target) {
+        int x = target.getBlockX();
+        int y = target.getBlockY();
+        int z = target.getBlockZ();
+
+        Bukkit.broadcastMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Bukkit.broadcastMessage("§6✦ §c§lМЕТЕОРИТНЫЙ ДОЖДЬ §6✦");
+        Bukkit.broadcastMessage("§7С неба упал метеорит! В его кратере уже появляется добыча.");
+        Bukkit.broadcastMessage("§fКоординаты: §eX: " + x + " §7| §eY: " + y + " §7| §eZ: " + z);
+        Bukkit.broadcastMessage("§7Предметы вылетают из кратера каждые §e3 секунды§7.");
+        Bukkit.broadcastMessage("§eУспейте добраться до метеорита и забрать редкие ресурсы!");
+        Bukkit.broadcastMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.playSound(online.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+        }
     }
 
     private Location configuredSpawn() {
