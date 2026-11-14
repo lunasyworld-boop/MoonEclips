@@ -66,15 +66,15 @@ public final class HubWorldBuilder {
         saveRegion("hub_mine", world, 38, Y - 2, -17, 76, Y + 16, 17, "mine");
         saveRegion("hub_pvp", world, -23, Y - 2, 35, 23, Y + 25, 81, "pvp");
 
-        savePoint("spawn", world, 0.5, Y + 2, 25.5, 180);
-        savePoint("top", world, 0.5, Y + 2, -57.5, 0);
-        savePoint("avto", world, 56.5, Y + 2, -1.5, 90);
-        savePoint("case", world, -54.5, Y + 2, -3.5, -90);
-        savePoint("freecase", world, -54.5, Y + 2, -39.5, -90);
+        savePoint("spawn", world, 0.5, Y + 3, 25.5, 180);
+        savePoint("top", world, 0.5, Y + 3, -57.5, 0);
+        savePoint("avto", world, 56.5, Y + 3, -1.5, 90);
+        savePoint("case", world, -54.5, Y + 3, -3.5, -90);
+        savePoint("freecase", world, -54.5, Y + 3, -39.5, -90);
         plugin.saveConfig();
 
-        world.setSpawnLocation(0, Y + 2, 25);
-        builder.teleport(new Location(world, 0.5, Y + 2, 25.5, 180, 0));
+        world.setSpawnLocation(0, Y + 3, 25);
+        builder.teleport(new Location(world, 0.5, Y + 3, 25.5, 180, 0));
         builder.sendMessage("§bMoonHub §8» §aЗимний мир создан: §f" + WORLD_NAME);
         builder.sendMessage("§7Старый мир MoonHub сохранён. Точки /spawn, /top, /avto, /case и /freecase перенесены.");
         plugin.getLogger().info("Winter hub generated in " + WORLD_NAME + " by " + builder.getName());
