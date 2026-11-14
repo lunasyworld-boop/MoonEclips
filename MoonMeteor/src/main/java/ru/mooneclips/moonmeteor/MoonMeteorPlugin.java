@@ -14,6 +14,8 @@ import org.bukkit.entity.Item;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -61,6 +63,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private final Map<UUID, Long> liveDrops = new HashMap<>();
     private final List<Location> meteorBlocks = new ArrayList<>();
     private NamespacedKey dropKey;
+    private NamespacedKey coinValueKey;
+    private Economy economy;
     private boolean active;
     private Location meteorCenter;
     private int baseY;
@@ -77,6 +81,12 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         dropKey = new NamespacedKey(this, "meteor_drop");
+        coinValueKey = new NamespacedKey(this, "meteor_coin_value");
+        if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
+            var registration = Bukkit.getServicesManager().getRegistration(Economy.class);
+            if (registration != null) economy = registration.getProvider();
+        }
+        if (economy == null) getLogger().warning("Vault economy не найден: монеты-подсолнухи не будут выпадать.");
         Bukkit.getPluginManager().registerEvents(this, this);
         cleanupPersistedRuntime();
         active = false;
@@ -285,7 +295,8 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         String rarity = eventRarity;
         List<ItemStack> loot = getLoot(rarity);
         if (loot.isEmpty()) return;
-        ItemStack stack = loot.get(random.nextInt(loot.size())).clone();
+        boolean coinDrop = economy != null && random.nextDouble() < getConfig().getDouble("coins.drop-chance", 0.08);
+        ItemStack stack = coinDrop ? createMeteorCoin() : loot.get(random.nextInt(loot.size())).clone();
         if (stack.getMaxStackSize() > 1) {
             int min = Math.max(1, getConfig().getInt("random-loot.min-amount", 1));
             int max = Math.min(stack.getMaxStackSize(),
@@ -308,6 +319,44 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         item.setCustomNameVisible(true);
         long despawn = Math.max(1, getConfig().getLong("event.item-despawn-seconds", 15));
         liveDrops.put(item.getUniqueId(), System.currentTimeMillis() + despawn * 1000L);
+    }
+
+    private ItemStack createMeteorCoin() {
+        int roll = random.nextInt(1000);
+        int value = roll < 500 ? 30 + random.nextInt(71)
+                : roll < 850 ? 100 + random.nextInt(401)
+                : roll < 980 ? 500 + random.nextInt(1501)
+                : 2000 + random.nextInt(8001);
+        ItemStack coin = new ItemStack(Material.SUNFLOWER);
+        ItemMeta meta = coin.getItemMeta();
+        meta.setDisplayName("§e§lМонета метеорита");
+        meta.setLore(List.of("§7Номинал: §6" + value + " Money", "§8Подберите, чтобы получить монеты"));
+        meta.getPersistentDataContainer().set(coinValueKey, PersistentDataType.INTEGER, value);
+        coin.setItemMeta(meta);
+        return coin;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMeteorCoinPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        ItemStack stack = event.getItem().getItemStack();
+        if (!stack.hasItemMeta()) return;
+        ItemMeta meta = stack.getItemMeta();
+        if (!meta.getPersistentDataContainer().has(coinValueKey, PersistentDataType.INTEGER)) return;
+        event.setCancelled(true);
+        Integer value = meta.getPersistentDataContainer().get(coinValueKey, PersistentDataType.INTEGER);
+        if (value == null || value <= 0) {
+            event.getItem().remove();
+            return;
+        }
+        if (economy == null) {
+            player.sendMessage("§cЭкономика недоступна. Обратитесь к администрации.");
+            return;
+        }
+        economy.depositPlayer(player, value);
+        event.getItem().remove();
+        player.sendMessage("§e✦ §aНа ваш баланс начислено §6" + value + " Money§a!");
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
     }
 
     private void tickDrops() {
