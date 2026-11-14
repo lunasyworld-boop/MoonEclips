@@ -1,0 +1,67 @@
+event:
+  duration-seconds: 600
+  drop-interval-seconds: 3
+  item-despawn-seconds: 15
+  protection-radius: 8
+  protection-height: 8
+spawn:
+  world: world
+  x: 0.5
+  y: 80.0
+  z: 0.5
+  random: true
+  random-radius: 500
+schedule:
+  enabled: false
+  time: "18:00"
+rarity-chances:
+  common: 70
+  molten: 25
+  burning: 5
+random-loot:
+  min-amount: 1
+  max-amount: 3
+loot:
+  common:
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: IRON_INGOT
+      amount: 4
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: GOLD_INGOT
+      amount: 3
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: DIAMOND
+      amount: 1
+  molten:
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: DIAMOND_BLOCK
+      amount: 2
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: EMERALD
+      amount: 4
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: NETHERITE_SCRAP
+      amount: 2
+  burning:
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: NETHERITE_INGOT
+      amount: 1
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: ENCHANTED_GOLDEN_APPLE
+      amount: 1
+    - ==: org.bukkit.inventory.ItemStack
+      v: 4189
+      type: BEACON
+      amount: 1
+random-pool: []
+runtime:
+  active: false
+  blocks: []
