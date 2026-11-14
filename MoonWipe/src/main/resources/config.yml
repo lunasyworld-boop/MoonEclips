@@ -1,4 +1,6 @@
 # MoonWipe 1.0.0 — Paper 1.21.4 / Java 21
+# Команда полноценного перезапуска, доступная из чата и консоли сервера.
+restart-command: restart
 settings:
   new-world-name: world
   countdown-seconds: 60
