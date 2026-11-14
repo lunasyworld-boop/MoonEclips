@@ -123,14 +123,14 @@ public final class HubWorldBuilder {
         saveRegion("hub_mine", world, 40, Y - 2, -16, 70, Y + 12, 16, "mine");
         saveRegion("hub_pvp", world, -55, Y - 2, 35, -15, Y + 25, 75, "pvp");
 
-        savePoint("spawn", world, 0.5, Y + 2, 0.5, 180);
-        savePoint("top", world, 0.5, Y + 2, -52.5, 0);
+        savePoint("spawn", world, 18.5, Y + 1, 18.5, 180);
+        savePoint("top", world, 10.5, Y + 2, -52.5, 0);
         savePoint("avto", world, 55.5, Y + 2, -13.5, 0);
         savePoint("case", world, -52.5, Y + 2, -34.5, 180);
         savePoint("freecase", world, -52.5, Y + 2, -58.5, 0);
         plugin.saveConfig();
 
-        builder.teleport(new Location(world, 0.5, Y + 2, 0.5, 180, 0));
+        builder.teleport(new Location(world, 18.5, Y + 1, 18.5, 180, 0));
         builder.sendMessage("§5MoonHub §8» §aМир MoonHub создан! Спавн, автошахта, кейс-зоны, топ-площадка и PvP-арена построены.");
         builder.sendMessage("§7Мир: §dMoonHub §8| §7Размер: §d200×200 §8| §7Автошахта: §d/avto");
         plugin.getLogger().info("MoonHub world build completed by " + builder.getName());
