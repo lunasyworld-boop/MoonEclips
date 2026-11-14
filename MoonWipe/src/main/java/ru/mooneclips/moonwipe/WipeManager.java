@@ -167,7 +167,7 @@ public final class WipeManager implements Listener {
             String lastRun = plugin.getConfig().getString("schedule.last-run", "");
             String runKey = target.toLocalDate().toString() + "@" + target.toLocalTime();
             if (lastRun.equals(runKey)) return;
-            if (!now.isBefore(start) && !now.isAfter(target)) {
+            if (!now.isBefore(start) && !now.isAfter(target.plusSeconds(1))) {
                 plugin.getConfig().set("schedule.last-run", runKey);
                 plugin.saveConfig();
                 long seconds = Math.max(0L, Duration.between(now, target).getSeconds());
