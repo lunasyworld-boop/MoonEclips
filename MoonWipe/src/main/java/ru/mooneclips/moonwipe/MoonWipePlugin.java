@@ -524,6 +524,12 @@ public final class MoonWipePlugin extends JavaPlugin implements CommandExecutor,
         if (Files.exists(schematic)) {
             sources.add(schematic);
         }
+        for (String extra : getConfig().getStringList("wipe.extra-data-paths")) {
+            Path extraPath = resolveSafeExtraPath(root, extra);
+            if (Files.exists(extraPath)) {
+                sources.add(extraPath);
+            }
+        }
         Path configFile = getDataFolder().toPath().resolve("config.yml");
         if (Files.exists(configFile)) {
             sources.add(configFile);
