@@ -356,10 +356,24 @@ public final class WipeManager implements Listener {
                 player.kickPlayer(MoonWipePlugin.color("&5Moon&bEclips &8» &cВыполняется полный вайп. Сервер перезапускается, зайдите позже."));
             }
 
-            // Даём Bukkit завершить обработку отключений, затем штатно останавливаем JVM.
+            // Команда /restart уже проверена владельцем сервера: она выполняет
+            // полноценный перезапуск через установленный на сервере механизм.
+            // Вызываем её от консоли, чтобы не зависеть от прав игрока.
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                plugin.getLogger().warning("MoonWipe: вызывается штатная остановка сервера. Для автоматического возврата онлайн панель хостинга должна перезапускать остановленный сервер.");
-                Bukkit.shutdown();
+                String restartCommand = plugin.getConfig().getString("restart-command", "restart");
+                if (restartCommand == null || restartCommand.isBlank()) {
+                    plugin.getLogger().severe("MoonWipe: restart-command пуст. Миры помечены для очистки, но сервер не перезапущен.");
+                    return;
+                }
+                restartCommand = restartCommand.trim();
+                if (restartCommand.startsWith("/")) restartCommand = restartCommand.substring(1);
+                boolean dispatched = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), restartCommand);
+                if (!dispatched) {
+                    plugin.getLogger().severe("MoonWipe: команда перезапуска не найдена или не выполнена: " + restartCommand
+                            + ". pending-wipe.yml сохранён; выполните /restart вручную из игры или консоли.");
+                } else {
+                    plugin.getLogger().warning("MoonWipe: отправлена команда перезапуска сервера: " + restartCommand);
+                }
             }, 20L);
         } catch (Exception ex) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
