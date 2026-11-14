@@ -70,6 +70,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Long> liveDrops = new HashMap<>();
     private final List<Location> meteorBlocks = new ArrayList<>();
+    private final Map<Location, Material> craterOriginalBlocks = new HashMap<>();
     private NamespacedKey dropKey;
     private NamespacedKey coinValueKey;
     private Economy economy;
@@ -312,6 +313,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
 
     private void buildImpactDebris() {
         World world = meteorCenter.getWorld();
+        buildCraterBowl(world);
         Material[] debris = {Material.BLACKSTONE, Material.BASALT, Material.MAGMA_BLOCK,
                 Material.COBBLED_DEEPSLATE, Material.TUFF};
         int radius = 13;
@@ -336,6 +338,36 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             ground.getRelative(0, 1, 0).setType(Material.MAGMA_BLOCK, false);
             meteorBlocks.add(ground.getRelative(0, 1, 0).getLocation());
         }
+    }
+
+    private void buildCraterBowl(World world) {
+        int craterRadius = 7;
+        for (int dx = -craterRadius; dx <= craterRadius; dx++) {
+            for (int dz = -craterRadius; dz <= craterRadius; dz++) {
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance > craterRadius) continue;
+                int x = meteorCenter.getBlockX() + dx;
+                int z = meteorCenter.getBlockZ() + dz;
+                Block surface = world.getHighestBlockAt(x, z);
+                int depth = 1 + (int) Math.floor((craterRadius - distance) / 3.0);
+                for (int dy = 0; dy < depth; dy++) {
+                    Block block = surface.getRelative(0, -dy, 0);
+                    if (!isNaturalCraterBlock(block.getType())) break;
+                    craterOriginalBlocks.putIfAbsent(block.getLocation(), block.getType());
+                    block.setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
+    private boolean isNaturalCraterBlock(Material material) {
+        return material == Material.GRASS_BLOCK || material == Material.DIRT
+                || material == Material.COARSE_DIRT || material == Material.ROOTED_DIRT
+                || material == Material.STONE || material == Material.DEEPSLATE
+                || material == Material.ANDESITE || material == Material.DIORITE
+                || material == Material.GRANITE || material == Material.TUFF
+                || material == Material.SAND || material == Material.RED_SAND
+                || material == Material.GRAVEL || material == Material.CLAY;
     }
 
     private Economy resolveEconomy() {
@@ -562,6 +594,7 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         meteorCenter = null;
         getConfig().set("runtime.active", false);
         getConfig().set("runtime.blocks", new ArrayList<>());
+        getConfig().set("runtime.original-blocks", new ArrayList<>());
         saveConfig();
         if (message != null && !message.isBlank()) Bukkit.broadcastMessage(message);
     }
@@ -572,6 +605,11 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
         cancelTask(hazardTask);
         cancelTask(guardTask);
         dropTask = visualTask = endTask = scheduledStartTask = countdownTask = hazardTask = guardTask = null;
+        for (UUID id : new HashSet<>(meteorGuards)) {
+            Entity guard = Bukkit.getEntity(id);
+            if (guard != null) guard.remove();
+        }
+        meteorGuards.clear();
         removeTimerHologram();
     }
 
@@ -598,6 +636,17 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             if (isMeteorMaterial(block.getType())) block.setType(Material.AIR, false);
         }
         meteorBlocks.clear();
+        restoreCraterBlocks();
+    }
+
+    private void restoreCraterBlocks() {
+        for (Map.Entry<Location, Material> entry : craterOriginalBlocks.entrySet()) {
+            Location location = entry.getKey();
+            if (location.getWorld() == null) continue;
+            Block block = location.getBlock();
+            if (block.getType().isAir()) block.setType(entry.getValue(), false);
+        }
+        craterOriginalBlocks.clear();
     }
 
     private boolean isMeteorMaterial(Material material) {
@@ -612,6 +661,15 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             locations.add(loc.getWorld().getName() + ";" + loc.getBlockX() + ";" + loc.getBlockY() + ";" + loc.getBlockZ());
         }
         getConfig().set("runtime.blocks", locations);
+        List<String> originals = new ArrayList<>();
+        for (Map.Entry<Location, Material> entry : craterOriginalBlocks.entrySet()) {
+            Location loc = entry.getKey();
+            if (loc.getWorld() != null) {
+                originals.add(loc.getWorld().getName() + ";" + loc.getBlockX() + ";" + loc.getBlockY()
+                        + ";" + loc.getBlockZ() + ";" + entry.getValue().name());
+            }
+        }
+        getConfig().set("runtime.original-blocks", originals);
         saveConfig();
     }
 
@@ -629,8 +687,25 @@ public final class MoonMeteorPlugin extends JavaPlugin implements Listener {
             } catch (NumberFormatException ignored) {
             }
         }
+        List<String> originals = getConfig().getStringList("runtime.original-blocks");
+        for (String value : originals) {
+            String[] parts = value.split(";");
+            if (parts.length != 5) continue;
+            World world = Bukkit.getWorld(parts[0]);
+            if (world == null) continue;
+            Material original = Material.matchMaterial(parts[4]);
+            if (original == null) continue;
+            try {
+                Block block = world.getBlockAt(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+                        Integer.parseInt(parts[3]));
+                if (block.getType().isAir()) block.setType(original, false);
+            } catch (NumberFormatException ignored) {
+            }
+        }
         removeTaggedDropsFromLoadedWorlds();
         getConfig().set("runtime.blocks", new ArrayList<>());
+        getConfig().set("runtime.original-blocks", new ArrayList<>());
+        craterOriginalBlocks.clear();
     }
 
     private boolean insideProtectedZone(Location location) {
