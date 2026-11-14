@@ -10,7 +10,7 @@ description: Безопасный ручной и автоматический �
 commands:
   mwipe:
     description: Управление вайпом MoonEclips
-    usage: /mwipe [start|confirm|cancel|backup|schedule|status|reload]
+    usage: /mwipe [menu|start|confirm|cancel|backup|schedule|status|reload]
     permission: moonwipe.admin
 permissions:
   moonwipe.admin:
