@@ -1,0 +1,10 @@
+# MoonHub 1.21.1b — Paper 1.21.4 / Java 21
+settings:
+  prefix: "<gradient:#b45cff:#ff75c8>MoonHub</gradient> <dark_gray>»</dark_gray> "
+  teleport-safe: true
+  mine-regeneration:
+    enabled: true
+    delay-seconds: 8
+    replacement: STONE
+points: {}
+regions: {}

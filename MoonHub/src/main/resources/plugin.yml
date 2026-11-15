@@ -1,0 +1,28 @@
+name: MoonHub
+version: 1.21.3b
+main: ru.mooneclips.moonhub.MoonHub
+api-version: '1.21'
+author: MoonEclips
+description: Hub management, spawn navigation and protected spawn regions for MoonEclips
+commands:
+  moonhub:
+    description: MoonHub administration menu and tools
+    usage: /moonhub
+    permission: moonhub.admin
+  spawn:
+    description: Teleport to MoonEclips spawn
+  top:
+    description: Teleport to leaderboards
+  avto:
+    description: Teleport to the auto mine
+  case:
+    description: Teleport to cases
+  freecase:
+    description: Teleport to the free case
+permissions:
+  moonhub.admin:
+    description: Full MoonHub administration access
+    default: op
+  moonhub.bypass:
+    description: Bypass MoonHub region protection
+    default: op

@@ -1,0 +1,25 @@
+name: Build MoonHub
+on:
+  push:
+    paths:
+      - 'MoonHub/**'
+      - '.github/workflows/moonhub-build.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build plugin
+        working-directory: MoonHub
+        run: mvn -B clean package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MoonHub-1.21.3b
+          path: MoonHub/target/MoonHub-1.21.3b.jar
+          if-no-files-found: error

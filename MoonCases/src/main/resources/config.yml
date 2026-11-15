@@ -1,0 +1,22 @@
+# Группы, которыми управляет кейс. Названия нужно заменить на реальные шесть групп MoonHub.
+donate-groups:
+  - eclips
+  - group2
+  - group3
+  - group4
+  - group5
+  - group6
+
+rewards:
+  donate:
+    # Вес каждого исхода; шансы рассчитываются относительно суммы весов.
+    eclips-7d: { group: eclips, days: 7, weight: 30, display: "&bEclips на 7 дней" }
+    eclips-14d: { group: eclips, days: 14, weight: 20, display: "&bEclips на 14 дней" }
+    eclips-30d: { group: eclips, days: 30, weight: 10, display: "&bEclips на 30 дней" }
+    eclips-permanent: { group: eclips, days: 0, weight: 2, display: "&6Eclips навсегда" }
+  titul:
+    moon: { display: "&bЛунный", weight: 30 }
+    star: { display: "&eЗвёздный", weight: 20 }
+    eclipse: { display: "&5Затмение", weight: 10 }
+
+# Титулы декоративные. Система отображения рядом с ником будет подключена отдельным этапом.
