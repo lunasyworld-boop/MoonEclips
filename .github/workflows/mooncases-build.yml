@@ -1,0 +1,31 @@
+name: Build MoonCases
+on:
+  push:
+    branches: [mooncases-development]
+    paths:
+      - 'MoonCases/**'
+      - '.github/workflows/mooncases-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'MoonCases/**'
+      - '.github/workflows/mooncases-build.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and verify
+        run: mvn -B -f MoonCases/pom.xml clean verify
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonCases-1.21.0-b
+          path: MoonCases/target/MoonCases-1.21.0-b.jar
+          if-no-files-found: error
