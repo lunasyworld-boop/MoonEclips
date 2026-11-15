@@ -318,7 +318,7 @@ public final class MoonCasesPlugin extends JavaPlugin implements Listener, Comma
         luckPerms.getUserManager().loadUser(p.getUniqueId()).thenCompose(user -> {
             List<Node> previous=user.getNodes().stream().filter(n->isManagedGroup(n,managed)).toList();
             user.data().clear(n->isManagedGroup(n,managed));
-            Node.Builder builder=Node.builder("group."+group);
+            var builder=Node.builder("group."+group);
             if(days>0) builder.expiry(Duration.ofDays(days));
             user.data().add(builder.build());
             return luckPerms.getUserManager().saveUser(user).handle((ignored,error)->{
