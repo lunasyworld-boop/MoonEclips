@@ -209,7 +209,7 @@ public final class MoonCasesPlugin extends JavaPlugin implements Listener, Comma
         luckPerms.getUserManager().loadUser(p.getUniqueId()).thenAccept(user -> {
             Set<String> managed = new HashSet<>(getConfig().getStringList("donate-groups"));
             user.data().clear(node -> node.getKey().startsWith("group.") && managed.contains(node.getKey().substring(6)));
-            Node.Builder builder = Node.builder("group."+group);
+            var builder = Node.builder("group."+group);
             if (days > 0) builder.expiry(Duration.ofDays(days));
             user.data().add(builder.build());
             luckPerms.getUserManager().saveUser(user).thenRun(() -> p.getScheduler().run(this, task -> p.sendMessage("§aПолучена привилегия "+group+"."), null));
